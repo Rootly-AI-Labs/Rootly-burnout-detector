@@ -1,0 +1,55 @@
+{
+  "analysis": {
+    "days_to_analyze": 30,
+    "business_hours": {
+      "start": 9,
+      "end": 17
+    },
+    "severity_weights": {
+      "sev1": 3.0,
+      "sev2": 2.0,
+      "sev3": 1.5,
+      "sev4": 1.0
+    },
+    "weekend_multiplier": 1.5,
+    "holiday_multiplier": 2.0
+  },
+  "burnout_thresholds": {
+    "incidents_per_week_high": 10,
+    "incidents_per_week_medium": 6,
+    "after_hours_percentage_high": 0.3,
+    "after_hours_percentage_medium": 0.15,
+    "avg_resolution_time_hours_high": 4,
+    "avg_resolution_time_hours_medium": 2,
+    "escalation_rate_high": 0.4,
+    "escalation_rate_medium": 0.2,
+    "recovery_time_hours_low": 4
+  },
+  "scoring": {
+    "emotional_exhaustion_weight": 0.4,
+    "depersonalization_weight": 0.3,
+    "personal_accomplishment_weight": 0.3,
+    "max_score": 10.0
+  },
+  "mcp_server": {
+    "transport": "stdio",
+    "command": "python",
+    "args": ["-m", "rootly_mcp_server"],
+    "env": {
+      "ROOTLY_API_TOKEN": "${ROOTLY_API_TOKEN}"
+    },
+    "timeout": 30
+  },
+  "output": {
+    "export_individual_scores": true,
+    "generate_recommendations": true,
+    "create_dashboard": true,
+    "output_dir": "output"
+  },
+  "data_sources": {
+    "include_incidents": true,
+    "include_alerts": false,
+    "include_workflows": false,
+    "min_severity": "sev4"
+  }
+}
