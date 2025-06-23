@@ -76,7 +76,22 @@ class RootlyMCPClient:
             raise RuntimeError("Not connected to MCP server")
         
         try:
-            result = await self.session.call_tool("users_get", {})
+            # Check if this is a local server that needs kwargs parameter
+            tools = await self.session.list_tools()
+            users_tool = next((t for t in tools.tools if t.name == "users_get"), None)
+            
+            if users_tool and users_tool.inputSchema:
+                required = users_tool.inputSchema.get("required", [])
+                if "kwargs" in required:
+                    # Local MCP server format - needs kwargs as string
+                    result = await self.session.call_tool("users_get", {"kwargs": "{}"})
+                else:
+                    # Hosted MCP server format - empty object
+                    result = await self.session.call_tool("users_get", {})
+            else:
+                # Fallback to empty object
+                result = await self.session.call_tool("users_get", {})
+            
             if result.content:
                 data = json.loads(result.content[0].text)
                 return data.get("data", [])
@@ -96,8 +111,22 @@ class RootlyMCPClient:
             raise RuntimeError("Not connected to MCP server")
         
         try:
-            # Use the incidents_get tool without parameters (returns all)
-            result = await self.session.call_tool("incidents_get", {})
+            # Check if this is a local server that needs kwargs parameter
+            tools = await self.session.list_tools()
+            incidents_tool = next((t for t in tools.tools if t.name == "incidents_get"), None)
+            
+            if incidents_tool and incidents_tool.inputSchema:
+                required = incidents_tool.inputSchema.get("required", [])
+                if "kwargs" in required:
+                    # Local MCP server format - needs kwargs as string
+                    result = await self.session.call_tool("incidents_get", {"kwargs": "{}"})
+                else:
+                    # Hosted MCP server format - empty object
+                    result = await self.session.call_tool("incidents_get", {})
+            else:
+                # Fallback to empty object
+                result = await self.session.call_tool("incidents_get", {})
+            
             if result.content:
                 data = json.loads(result.content[0].text)
                 return data.get("data", [])
