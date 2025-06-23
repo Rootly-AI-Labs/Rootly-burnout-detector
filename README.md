@@ -7,21 +7,45 @@ A data-driven burnout detection system for on-call engineers using Rootly's inci
 1. **Setup Environment**
    ```bash
    pip install -r requirements.txt
-   export ROOTLY_API_TOKEN="your-rootly-api-token"
    ```
 
-2. **Configure Analysis**
+2. **Configure Rootly API Token** (choose one method):
+   
+   **Option A: Environment Variable (Recommended)**
+   ```bash
+   export ROOTLY_API_TOKEN="your-rootly-api-token"
+   ```
+   
+   **Option B: secrets.env File (Secure)**
+   ```bash
+   cp secrets.env.example secrets.env
+   # Edit secrets.env with your token
+   ```
+   
+   **Option C: Command Line**
+   ```bash
+   python main.py --token "your-rootly-api-token" --days 30
+   ```
+
+3. **Configure Analysis**
    ```bash
    cp config/config.example.json config/config.json
    # Edit config.json with your thresholds
    ```
 
-3. **Run Analysis**
+4. **Run Analysis**
    ```bash
    python main.py --days 30
    ```
 
-4. **View Results**
+5. **Interactive Mode (Optional)**
+   ```bash
+   # Set LLM API key for Q&A mode
+   export OPENAI_API_KEY="your-openai-key"  # or ANTHROPIC_API_KEY, HF_TOKEN
+   python main.py --days 30 --interactive
+   ```
+
+6. **View Results**
    ```bash
    open output/dashboard.html
    ```
@@ -58,12 +82,34 @@ rootly-burnout-detector/
 
 ## Configuration
 
+### Token Management
+
+**Security Levels (Best → Worst):**
+1. **Environment Variable** - Most secure, not stored in files
+2. **secrets.env File** - Git-ignored, team-friendly
+3. **Command Line** - Convenient but visible in process lists
+
+**Token Precedence:**
+1. `--token` command line flag (highest priority)
+2. `ROOTLY_API_TOKEN` environment variable  
+3. `secrets.env` file
+4. `.env` file (lowest priority)
+
+### Analysis Settings
+
 Edit `config/config.json` to adjust:
 - Analysis time period (default: 30 days)
 - Burnout risk thresholds
 - Business hours definition
 - Severity weights
 - Output options
+
+### Interactive Mode
+
+For interactive Q&A mode, set one LLM API key:
+- `OPENAI_API_KEY` - GPT-4 (paid, high quality)
+- `ANTHROPIC_API_KEY` - Claude (paid, high quality)  
+- `HF_TOKEN` - Hugging Face (free tier available)
 
 ## Burnout Metrics
 

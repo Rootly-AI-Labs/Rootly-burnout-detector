@@ -1,7 +1,9 @@
 # Environment variables and secrets
 .env
 *.env
+secrets.env
 !.env.example
+!secrets.env.example
 
 # Python
 __pycache__/

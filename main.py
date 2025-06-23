@@ -12,19 +12,35 @@ import sys
 from pathlib import Path
 from typing import Dict, Any
 
-# Load environment variables from .env file
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    # python-dotenv not installed, try manual loading
-    env_path = Path(__file__).parent / ".env"
-    if env_path.exists():
-        with open(env_path) as f:
-            for line in f:
-                if line.strip() and not line.startswith('#'):
-                    key, value = line.strip().split('=', 1)
-                    os.environ[key] = value
+# Load environment variables from multiple sources
+def load_environment_variables():
+    """Load environment variables from .env, secrets.env, etc."""
+    env_files = [".env", "secrets.env"]
+    
+    # Try using python-dotenv first
+    try:
+        from dotenv import load_dotenv
+        for env_file in env_files:
+            env_path = Path(__file__).parent / env_file
+            if env_path.exists():
+                load_dotenv(env_path)
+                print(f"Loaded environment from {env_file}")
+    except ImportError:
+        # Manual loading if python-dotenv not available
+        for env_file in env_files:
+            env_path = Path(__file__).parent / env_file
+            if env_path.exists():
+                with open(env_path) as f:
+                    for line in f:
+                        if line.strip() and not line.startswith('#'):
+                            if '=' in line:
+                                key, value = line.strip().split('=', 1)
+                                # Remove quotes if present
+                                value = value.strip('"\'')
+                                os.environ[key] = value
+                print(f"Loaded environment from {env_file}")
+
+load_environment_variables()
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -178,6 +194,16 @@ async def main():
         action="store_true",
         help="Test connection without running analysis"
     )
+    parser.add_argument(
+        "--interactive", 
+        action="store_true",
+        help="Start interactive analysis mode after completing analysis"
+    )
+    parser.add_argument(
+        "--token",
+        type=str,
+        help="Rootly API token (overrides environment variables)"
+    )
     
     args = parser.parse_args()
     
@@ -187,6 +213,16 @@ async def main():
     
     print("Rootly Burnout Detector")
     print("=" * 30)
+    
+    # Handle token from command line
+    if args.token:
+        os.environ["ROOTLY_API_TOKEN"] = args.token
+        print("Using token from command line")
+    
+    # Set up ROOTLY_AUTH_HEADER for MCP server
+    if os.environ.get("ROOTLY_API_TOKEN"):
+        os.environ["ROOTLY_AUTH_HEADER"] = f"Bearer {os.environ['ROOTLY_API_TOKEN']}"
+        print("✓ Rootly authentication configured")
     
     # Load configuration
     config = load_config(args.config)
@@ -285,6 +321,27 @@ async def main():
                 print(f"  - {user['user_name']}: {user['burnout_score']}/10")
         
         print(f"\nAnalysis complete! Check {args.output}/ for detailed results.")
+        
+        # Start interactive mode if requested
+        if args.interactive:
+            try:
+                from interactive_analyzer import InteractiveAnalyzer, check_interactive_requirements
+                
+                # Check if interactive mode is available
+                available, message = check_interactive_requirements()
+                if not available:
+                    print(f"\nInteractive mode not available: {message}")
+                else:
+                    print(f"\n{message}")
+                    analyzer = InteractiveAnalyzer(results)
+                    analyzer.start_session()
+                    
+            except ImportError as e:
+                print(f"\nInteractive mode not available: {e}")
+                print("Install interactive dependencies with: pip install smolagents>=0.1.0 rich>=13.0.0")
+            except Exception as e:
+                logger.error(f"Interactive mode failed: {e}", exc_info=True)
+                print(f"Interactive mode failed: {e}")
         
     except KeyboardInterrupt:
         print("\nAnalysis interrupted by user")
