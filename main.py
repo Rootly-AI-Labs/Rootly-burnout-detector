@@ -23,7 +23,9 @@ def load_environment_variables():
         for env_file in env_files:
             env_path = Path(__file__).parent / env_file
             if env_path.exists():
-                load_dotenv(env_path)
+                # Use override=True to ensure variables are set in os.environ
+                # This ensures subprocesses inherit them
+                load_dotenv(env_path, override=True)
                 print(f"Loaded environment from {env_file}")
     except ImportError:
         # Manual loading if python-dotenv not available

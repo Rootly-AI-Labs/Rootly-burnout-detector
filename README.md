@@ -27,13 +27,19 @@ A data-driven burnout detection system for on-call engineers using Rootly's inci
    python main.py --token "your-rootly-api-token" --days 30
    ```
 
-3. **Configure Analysis**
+3. **Install Local MCP Server**
    ```bash
-   cp config/config.example.json config/config.json
-   # Edit config.json with your thresholds
+   pip install rootly-mcp-server
    ```
 
 4. **Run Analysis**
+   
+   **Option A: Local MCP Server (Recommended)**
+   ```bash
+   python main.py --config config/config.local-pip.json --days 30
+   ```
+   
+   **Option B: uvx MCP Server**
    ```bash
    python main.py --days 30
    ```
@@ -42,7 +48,7 @@ A data-driven burnout detection system for on-call engineers using Rootly's inci
    ```bash
    # Set LLM API key for Q&A mode
    export OPENAI_API_KEY="your-openai-key"  # or ANTHROPIC_API_KEY, HF_TOKEN
-   python main.py --days 30 --interactive
+   python main.py --config config/config.local-pip.json --days 30 --interactive
    ```
 
 6. **View Results**
@@ -136,8 +142,22 @@ For interactive Q&A mode, set one LLM API key:
 - **Trend Analysis**: Changes over time
 - **Actionable Recommendations**: Suggested interventions
 
+## MCP Server Options
+
+The tool supports two MCP server configurations:
+
+### Local MCP Server (Recommended)
+- Faster and more reliable
+- Requires `pip install rootly-mcp-server`
+- Use: `--config config/config.local-pip.json`
+
+### uvx MCP Server
+- Uses uvx to manage the MCP server
+- Default configuration
+- May have parameter compatibility issues
+
 ## Requirements
 
 - Python 3.12+
-- Access to Rootly MCP server
 - Rootly API token
+- rootly-mcp-server (for local mode)

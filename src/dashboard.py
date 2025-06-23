@@ -142,6 +142,17 @@ class BurnoutDashboard:
             <p>Period: {metadata.get('days_analyzed', 'N/A')} days | 
                Users: {metadata.get('total_users_analyzed', 'N/A')} | 
                Incidents: {metadata.get('total_incidents', 'N/A')}</p>
+            
+            <div style="margin-top: 15px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; border-left: 4px solid #007bff;">
+                <h4 style="margin: 0 0 10px 0; color: #495057;">How Burnout Scores Are Calculated</h4>
+                <p style="margin: 0; color: #6c757d; font-size: 0.9em;">
+                    Scores (0-10) are based on the <strong>Maslach Burnout Inventory</strong> using three dimensions:
+                    <strong>Emotional Exhaustion</strong> (incident frequency, after-hours work, resolution time),
+                    <strong>Depersonalization</strong> (escalation rates, collaboration patterns), and
+                    <strong>Personal Accomplishment</strong> (resolution success, response effectiveness).
+                    Higher scores indicate greater burnout risk.
+                </p>
+            </div>
         </div>
         
         <div class="metrics-grid">
@@ -165,7 +176,7 @@ class BurnoutDashboard:
         
         <div class="chart-container">
             <h3>Burnout Scores by User</h3>
-            <canvas id="scoresChart" width="400" height="300"></canvas>
+            <canvas id="scoresChart" width="400" height="200"></canvas>
         </div>
         
         <div class="user-list">
