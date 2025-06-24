@@ -35,10 +35,14 @@ class RootlyDataCollector:
             
             # Validate data collection succeeded
             if len(users) == 0:
-                raise RuntimeError("❌ Failed to fetch users from Rootly. Check your API token and MCP server connection.")
+                raise RuntimeError("❌ Failed to fetch users from Rootly. This likely indicates:\n" +
+                                 "  • Invalid or expired API token\n" +
+                                 "  • 404 error - API endpoint not accessible\n" +
+                                 "  • Network connectivity issues\n" +
+                                 "  • Insufficient permissions for your API token")
             
             if len(incidents) == 0:
-                logger.warning(f"⚠️  No incidents found in the last {days_to_analyze} days. This may be normal for quiet periods.")
+                logger.warning(f"⚠️  No incidents found in the last {days_to_analyze} days. This may be normal for quiet periods or indicate API access issues.")
             
             logger.info(f"Collected {len(users)} users, {len(incidents)} incidents")
             

@@ -83,6 +83,15 @@ class RootlyMCPClient:
                 content_text = result.content[0].text
                 if content_text.strip():
                     data = json.loads(content_text)
+                    # Check for error indicators in response
+                    if "error" in data:
+                        error_msg = data.get("error", "Unknown error")
+                        if "404" in error_msg:
+                            raise RuntimeError("❌ 404 Error: Rootly API endpoint not found. Check your API token and permissions.")
+                        elif "401" in error_msg:
+                            raise RuntimeError("❌ 401 Error: Unauthorized access to Rootly API. Check your API token.")
+                        else:
+                            raise RuntimeError(f"❌ API Error: {error_msg}")
                     return data.get("data", [])
                 else:
                     logger.warning("Empty response from users_get tool")
@@ -96,8 +105,18 @@ class RootlyMCPClient:
                 logger.error(f"Raw response: {result.content[0].text[:500]}")
             raise RuntimeError(f"Failed to parse users response from Rootly API: {e}")
         except Exception as e:
+            error_msg = str(e)
             logger.error(f"Error fetching users: {e}")
-            raise RuntimeError(f"Failed to fetch users from Rootly: {e}")
+            
+            # Check for specific API errors
+            if "404" in error_msg or "Not Found" in error_msg:
+                raise RuntimeError("❌ 404 Error: Rootly API endpoint not found. Check your API token and permissions.")
+            elif "401" in error_msg or "Unauthorized" in error_msg:
+                raise RuntimeError("❌ 401 Error: Unauthorized access to Rootly API. Check your API token.")
+            elif "403" in error_msg or "Forbidden" in error_msg:
+                raise RuntimeError("❌ 403 Error: Access forbidden to Rootly API. Check your API token permissions.")
+            else:
+                raise RuntimeError(f"❌ Failed to fetch users from Rootly: {e}")
     
     async def get_incidents(
         self, 
@@ -117,6 +136,15 @@ class RootlyMCPClient:
                 content_text = result.content[0].text
                 if content_text.strip():
                     data = json.loads(content_text)
+                    # Check for error indicators in response
+                    if "error" in data:
+                        error_msg = data.get("error", "Unknown error")
+                        if "404" in error_msg:
+                            raise RuntimeError("❌ 404 Error: Rootly API endpoint not found. Check your API token and permissions.")
+                        elif "401" in error_msg:
+                            raise RuntimeError("❌ 401 Error: Unauthorized access to Rootly API. Check your API token.")
+                        else:
+                            raise RuntimeError(f"❌ API Error: {error_msg}")
                     return data.get("data", [])
                 else:
                     logger.warning("Empty response from incidents_get tool")
@@ -130,8 +158,18 @@ class RootlyMCPClient:
                 logger.error(f"Raw response: {result.content[0].text[:500]}")
             raise RuntimeError(f"Failed to parse incidents response from Rootly API: {e}")
         except Exception as e:
+            error_msg = str(e)
             logger.error(f"Error fetching incidents: {e}")
-            raise RuntimeError(f"Failed to fetch incidents from Rootly: {e}")
+            
+            # Check for specific API errors
+            if "404" in error_msg or "Not Found" in error_msg:
+                raise RuntimeError("❌ 404 Error: Rootly API endpoint not found. Check your API token and permissions.")
+            elif "401" in error_msg or "Unauthorized" in error_msg:
+                raise RuntimeError("❌ 401 Error: Unauthorized access to Rootly API. Check your API token.")
+            elif "403" in error_msg or "Forbidden" in error_msg:
+                raise RuntimeError("❌ 403 Error: Access forbidden to Rootly API. Check your API token permissions.")
+            else:
+                raise RuntimeError(f"❌ Failed to fetch incidents from Rootly: {e}")
     
     async def get_all_incidents(self, days_back: int = 30) -> List[Dict[str, Any]]:
         """Fetch all incidents with pagination."""
