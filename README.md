@@ -1,6 +1,12 @@
 # Rootly Burnout Detector
 
-A data-driven burnout detection system for on-call engineers using Rootly's incident data and Christina Maslach's Burnout Inventory research.
+A data-driven burnout detection system for on-call engineers using Rootly's incident data and Christina Maslach's Burnout Inventory research. The system connects to Rootly via the [Model Context Protocol (MCP)](https://github.com/Rootly-AI-Labs/Rootly-MCP-server/tree/main), enabling secure and efficient data retrieval.
+
+## Requirements
+
+- Python 3.12+
+- Rootly API token
+- [rootly-mcp-server](https://github.com/Rootly-AI-Labs/Rootly-MCP-server/tree/main) (for local mode)
 
 ## Quick Start
 
@@ -9,22 +15,10 @@ A data-driven burnout detection system for on-call engineers using Rootly's inci
    pip install -r requirements.txt
    ```
 
-2. **Configure Rootly API Token** (choose one method):
-   
-   **Option A: Environment Variable (Recommended)**
-   ```bash
-   export ROOTLY_API_TOKEN="your-rootly-api-token"
-   ```
-   
-   **Option B: secrets.env File (Secure)**
+2. **Configure Rootly API Token**
    ```bash
    cp secrets.env.example secrets.env
    # Edit secrets.env with your token
-   ```
-   
-   **Option C: Command Line**
-   ```bash
-   python main.py --token "your-rootly-api-token" --days 30
    ```
 
 3. **Install Local MCP Server**
@@ -39,7 +33,7 @@ A data-driven burnout detection system for on-call engineers using Rootly's inci
    python main.py --config config/config.local-pip.json --days 30
    ```
    
-   **Option B: uvx MCP Server**
+   **Option B: uvx MCP Server (Remote)**
    ```bash
    python main.py --days 30
    ```
@@ -61,18 +55,23 @@ A data-driven burnout detection system for on-call engineers using Rootly's inci
 ```
 rootly-burnout-detector/
 ├── config/
-│   ├── config.json           # Analysis configuration
+│   ├── config.json           # Default (uvx/remote) configuration
+│   ├── config.local-pip.json # Local MCP server configuration
 │   └── config.example.json   # Example configuration
 ├── src/
 │   ├── mcp_client.py         # MCP server connection
 │   ├── data_collector.py     # Data extraction from Rootly
 │   ├── burnout_analyzer.py   # Risk calculation engine
-│   └── dashboard.py          # HTML report generation
+│   ├── dashboard.py          # HTML report generation
+│   ├── interactive_analyzer.py # LLM-powered Q&A interface
+│   └── burnout_tools.py      # Custom smolagents tools
 ├── output/
-│   ├── burnout_data.json     # Analysis results
-│   └── dashboard.html        # Interactive dashboard
-├── tests/
-│   └── test_*.py            # Unit tests
+│   ├── burnout_analysis.json # Analysis results
+│   ├── dashboard.html        # Interactive dashboard
+│   ├── summary_report.txt    # Text summary
+│   └── individual_reports/   # Per-user detailed reports
+├── secrets.env               # API tokens (git-ignored)
+├── secrets.env.example       # Example secrets file
 ├── requirements.txt          # Python dependencies
 └── main.py                  # Entry point
 ```
@@ -90,16 +89,12 @@ rootly-burnout-detector/
 
 ### Token Management
 
-**Security Levels (Best → Worst):**
-1. **Environment Variable** - Most secure, not stored in files
-2. **secrets.env File** - Git-ignored, team-friendly
-3. **Command Line** - Convenient but visible in process lists
+Add your Rootly API token to the `secrets.env` file:
+```bash
+ROOTLY_API_TOKEN=your-rootly-api-token-here
+```
 
-**Token Precedence:**
-1. `--token` command line flag (highest priority)
-2. `ROOTLY_API_TOKEN` environment variable  
-3. `secrets.env` file
-4. `.env` file (lowest priority)
+The token can also be provided via environment variable or command line flag if needed.
 
 ### Analysis Settings
 
@@ -151,13 +146,7 @@ The tool supports two MCP server configurations:
 - Requires `pip install rootly-mcp-server`
 - Use: `--config config/config.local-pip.json`
 
-### uvx MCP Server
-- Uses uvx to manage the MCP server
+### uvx MCP Server (Remote)
+- Uses uvx to connect to remotely hosted MCP server
 - Default configuration
 - May have parameter compatibility issues
-
-## Requirements
-
-- Python 3.12+
-- Rootly API token
-- rootly-mcp-server (for local mode)
