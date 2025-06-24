@@ -6,6 +6,7 @@ import json
 import os
 from typing import Dict, Any, List
 from pathlib import Path
+from datetime import datetime
 
 
 class BurnoutDashboard:
@@ -26,6 +27,17 @@ class BurnoutDashboard:
         """Generate the complete HTML content."""
         individual_analyses = self.results.get("individual_analyses", [])
         metadata = self.results.get("metadata", {})
+        
+        # Format timestamp for display
+        timestamp = metadata.get('analysis_timestamp', 'N/A')
+        if timestamp != 'N/A':
+            try:
+                dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                formatted_timestamp = dt.strftime('%B %d, %Y at %I:%M %p')
+            except:
+                formatted_timestamp = timestamp
+        else:
+            formatted_timestamp = timestamp
         
         # Prepare data for JavaScript
         chart_data = self._prepare_chart_data(individual_analyses)
@@ -105,6 +117,79 @@ class BurnoutDashboard:
         .user-name {{
             font-weight: 500;
         }}
+        .expand-arrow {{
+            cursor: pointer;
+            margin-right: 8px;
+            color: #007bff;
+            font-size: 12px;
+            transition: transform 0.2s ease;
+            display: inline-block;
+        }}
+        .expand-arrow:hover {{
+            color: #0056b3;
+        }}
+        .expand-arrow.expanded {{
+            transform: rotate(90deg);
+        }}
+        .user-details {{
+            display: none;
+            margin-top: 15px;
+            padding: 20px;
+            margin-left: 15px;
+            margin-right: 15px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }}
+        .user-details.show {{
+            display: block;
+        }}
+        .detail-section {{
+            margin-bottom: 20px;
+            padding: 16px;
+            background-color: rgba(255,255,255,0.7);
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }}
+        .detail-section:last-child {{
+            margin-bottom: 0;
+        }}
+        .detail-label {{
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        .detail-value {{
+            font-size: 0.9em;
+            color: #495057;
+            margin-left: 0;
+            line-height: 1.5;
+        }}
+        .metric-row {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            background-color: rgba(248,249,250,0.8);
+            border-radius: 6px;
+        }}
+        .metric-row:last-child {{
+            margin-bottom: 0;
+        }}
+        .metric-row span:first-child {{
+            color: #6c757d;
+            font-weight: 500;
+        }}
+        .metric-row span:last-child {{
+            color: #2c3e50;
+            font-weight: 600;
+        }}
         .user-score {{
             font-weight: bold;
             padding: 4px 8px;
@@ -138,7 +223,7 @@ class BurnoutDashboard:
     <div class="container">
         <div class="header">
             <h1>Rootly Burnout Analysis Dashboard</h1>
-            <p class="timestamp">Analysis completed: {metadata.get('analysis_timestamp', 'N/A')}</p>
+            <p class="timestamp">Analysis completed: {formatted_timestamp}</p>
             <p>Period: {metadata.get('days_analyzed', 'N/A')} days | 
                Users: {metadata.get('total_users_analyzed', 'N/A')} | 
                Incidents: {metadata.get('total_incidents', 'N/A')}</p>
@@ -213,6 +298,16 @@ class BurnoutDashboard:
                 }}
             }}
         }});
+        
+        // Toggle user details dropdown
+        function toggleUserDetails(userId) {{
+            const detailsElement = document.getElementById('details-' + userId);
+            const arrowElement = event.target;
+            if (detailsElement) {{
+                detailsElement.classList.toggle('show');
+                arrowElement.classList.toggle('expanded');
+            }}
+        }}
     </script>
 </body>
 </html>
@@ -284,17 +379,108 @@ class BurnoutDashboard:
             recommendations = analysis.get('recommendations', [])
             top_rec = recommendations[0] if recommendations else "No specific recommendations"
             
+            # Generate detailed metrics display
+            user_details = self._generate_user_details(analysis)
+            
             html += f"""
             <div class="user-item">
-                <div>
-                    <div class="user-name">{user_name}</div>
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center;">
+                        <span class="expand-arrow" onclick="toggleUserDetails('{analysis.get('user_id', '')}')">▶</span>
+                        <div class="user-name">{user_name}</div>
+                    </div>
                     <div style="font-size: 0.8em; color: #666; margin-top: 4px;">{top_rec}</div>
+                    <div id="details-{analysis.get('user_id', '')}" class="user-details">
+                        {user_details}
+                    </div>
                 </div>
                 <div class="user-score" style="background-color: {bg_color}">{score}</div>
             </div>
             """
         
         return html
+    
+    def _generate_user_details(self, analysis: Dict[str, Any]) -> str:
+        """Generate detailed metrics for a user."""
+        user_id = analysis.get('user_id', '')
+        user_email = analysis.get('user_email', '')
+        key_metrics = analysis.get('key_metrics', {})
+        dimensions = analysis.get('dimensions', {})
+        
+        # Format key metrics
+        total_incidents = key_metrics.get('total_incidents', 0)
+        incidents_per_week = key_metrics.get('incidents_per_week', 0)
+        after_hours_incidents = key_metrics.get('after_hours_incidents', 0)
+        avg_resolution_time = key_metrics.get('avg_resolution_time_hours', 0)
+        resolution_success_rate = key_metrics.get('resolution_success_rate', 0)
+        
+        # Format resolution time as hours and minutes
+        if avg_resolution_time >= 1:
+            hours = int(avg_resolution_time)
+            minutes = int((avg_resolution_time - hours) * 60)
+            if minutes > 0:
+                resolution_time_display = f"{hours}h {minutes}m"
+            else:
+                resolution_time_display = f"{hours}h"
+        else:
+            minutes = int(avg_resolution_time * 60)
+            resolution_time_display = f"{minutes}m"
+        
+        # Format dimension scores
+        emotional_exhaustion = dimensions.get('emotional_exhaustion', {}).get('score', 0)
+        depersonalization = dimensions.get('depersonalization', {}).get('score', 0)
+        personal_accomplishment = dimensions.get('personal_accomplishment', {}).get('score', 0)
+        
+        
+        details_html = f"""
+        <div class="detail-section">
+            <div class="detail-label">📧 Contact</div>
+            <div class="detail-value">User ID: {user_id}</div>
+            <div class="detail-value">Email: {user_email}</div>
+        </div>
+        
+        <div class="detail-section">
+            <div class="detail-label">📊 Key Metrics (Last 30 Days)</div>
+            <div class="metric-row">
+                <span>Total Incidents:</span>
+                <span><strong>{total_incidents}</strong></span>
+            </div>
+            <div class="metric-row">
+                <span>Incidents/Week:</span>
+                <span><strong>{incidents_per_week:.2f}</strong></span>
+            </div>
+            <div class="metric-row">
+                <span>After-Hours Incidents:</span>
+                <span><strong>{after_hours_incidents}</strong></span>
+            </div>
+            <div class="metric-row">
+                <span>Avg Resolution Time:</span>
+                <span><strong>{resolution_time_display}</strong></span>
+            </div>
+            <div class="metric-row">
+                <span>Resolution Success Rate:</span>
+                <span><strong>{resolution_success_rate:.1%}</strong></span>
+            </div>
+        </div>
+        
+        <div class="detail-section">
+            <div class="detail-label">🧠 Burnout Dimensions</div>
+            <div class="metric-row">
+                <span>Emotional Exhaustion:</span>
+                <span><strong>{emotional_exhaustion:.2f}/10</strong></span>
+            </div>
+            <div class="metric-row">
+                <span>Depersonalization:</span>
+                <span><strong>{depersonalization:.2f}/10</strong></span>
+            </div>
+            <div class="metric-row">
+                <span>Personal Accomplishment:</span>
+                <span><strong>{personal_accomplishment:.2f}/10</strong></span>
+            </div>
+        </div>
+        """
+        
+        return details_html
     
     def _count_risk_level(self, analyses: List[Dict[str, Any]], risk_level: str) -> int:
         """Count users at a specific risk level."""
