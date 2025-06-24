@@ -15,14 +15,20 @@ A data-driven burnout detection system for on-call engineers using Rootly's inci
    pip install -r requirements.txt
    ```
 
-2. **Configure Rootly API Token**
+2. **Configure API Tokens**
    ```bash
    cp secrets.env.example secrets.env
    ```
    
-   Edit `secrets.env` and add your Rootly API token:
+   Edit `secrets.env` and add your tokens:
    ```bash
+   # Required
    ROOTLY_API_TOKEN=your-rootly-api-token-here
+   
+   # Optional - for interactive Q&A mode (add one)
+   OPENAI_API_KEY=sk-your-openai-key-here      # GPT-4
+   ANTHROPIC_API_KEY=sk-ant-your-anthropic-key # Claude
+   HF_TOKEN=hf_your-huggingface-token          # Hugging Face (free)
    ```
 
 3. **Run Analysis**
@@ -32,8 +38,7 @@ A data-driven burnout detection system for on-call engineers using Rootly's inci
 
 4. **Interactive Mode (Optional)**
    ```bash
-   # Set LLM API key for Q&A mode
-   export OPENAI_API_KEY="your-openai-key"  # or ANTHROPIC_API_KEY, HF_TOKEN
+   # Requires LLM API key configured in step 2
    python main.py --days 30 --interactive
    ```
 
