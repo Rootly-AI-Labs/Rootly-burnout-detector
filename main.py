@@ -23,7 +23,9 @@ def load_environment_variables():
         for env_file in env_files:
             env_path = Path(__file__).parent / env_file
             if env_path.exists():
-                load_dotenv(env_path)
+                # Use override=True to ensure variables are set in os.environ
+                # This ensures subprocesses inherit them
+                load_dotenv(env_path, override=True)
                 print(f"Loaded environment from {env_file}")
     except ImportError:
         # Manual loading if python-dotenv not available
@@ -219,10 +221,24 @@ async def main():
         os.environ["ROOTLY_API_TOKEN"] = args.token
         print("Using token from command line")
     
-    # Set up ROOTLY_AUTH_HEADER for MCP server
+    # Set up authentication for MCP server
     if os.environ.get("ROOTLY_API_TOKEN"):
-        os.environ["ROOTLY_AUTH_HEADER"] = f"Bearer {os.environ['ROOTLY_API_TOKEN']}"
-        print("✓ Rootly authentication configured")
+        # Check if using hosted MCP server (needs AUTH_HEADER) or local server (direct token)
+        config_preview_path = Path(args.config)
+        if config_preview_path.exists():
+            with open(config_preview_path) as f:
+                config_preview = json.load(f)
+            
+            mcp_args = config_preview.get("mcp_server", {}).get("args", [])
+            if "mcp-remote" in str(mcp_args):
+                # Hosted MCP server - needs Bearer header
+                os.environ["ROOTLY_AUTH_HEADER"] = f"Bearer {os.environ['ROOTLY_API_TOKEN']}"
+                print("✓ Hosted MCP server authentication configured")
+            else:
+                # Local MCP server - uses token directly
+                print("✓ Local MCP server authentication configured")
+        else:
+            print("✓ Rootly authentication configured")
     
     # Load configuration
     config = load_config(args.config)
