@@ -1,6 +1,6 @@
 # Rootly Burnout Detector
 
-A data-driven burnout detection system for on-call engineers using Rootly's incident data and Christina Maslach's Burnout Inventory research. The system connects to Rootly via the [Model Context Protocol (MCP)](https://github.com/Rootly-AI-Labs/Rootly-MCP-server/tree/main), enabling secure and efficient data retrieval.
+A data-driven burnout detection system for on-call engineers using Rootly's incident data and Christina Maslach's Burnout Inventory research. The system connects to Rootly's [MCP Server](https://github.com/Rootly-AI-Labs/Rootly-MCP-server/tree/main), enabling secure and efficient data retrieval.
 
 ## Requirements
 
@@ -146,3 +146,40 @@ The tool supports two MCP server configurations:
 - Faster and more reliable for heavy usage
 - Requires `pip install rootly-mcp-server`
 - Use: `--config config/config.local-pip.json`
+
+## How Burnout Scores Are Calculated
+
+This tool uses **Christina Maslach's Burnout Assessment Inventory**, adapted for on-call engineering work. The system analyzes three dimensions:
+
+### 1. **Emotional Exhaustion (40% weight)**
+Measures physical and emotional depletion from work demands:
+- Incident frequency relative to team norms
+- After-hours work percentage  
+- Average incident resolution time
+- Incident clustering (multiple incidents within 4 hours)
+
+### 2. **Depersonalization (30% weight)**  
+Measures cynicism and detachment from work:
+- Escalation frequency (inability to resolve alone)
+- Solo incident handling rate
+- Response time trends (are you getting slower to respond over time?)
+- Communication quality (resolution message length)
+
+### 3. **Personal Accomplishment (30% weight, inverted)**
+Measures sense of achievement and competence:
+- Incident resolution success rate
+- Resolution time improvement trends
+- Handling of complex/high-severity incidents  
+- Knowledge sharing and documentation quality
+
+### Overall Score
+```
+Burnout Score = (Emotional Exhaustion × 0.4) + (Depersonalization × 0.3) + ((10 - Personal Accomplishment) × 0.3)
+```
+
+**Score Ranges:**
+- **0-3.9**: Low risk - Healthy engagement levels
+- **4.0-6.9**: Medium risk - Early warning signs, intervention recommended
+- **7.0-10**: High risk - Immediate action needed
+
+The scoring system identifies early burnout indicators through incident response patterns, enabling proactive interventions before burnout becomes severe.

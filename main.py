@@ -341,7 +341,7 @@ async def main():
         # Start interactive mode if requested
         if args.interactive:
             try:
-                from interactive_analyzer import InteractiveAnalyzer, check_interactive_requirements
+                from src.interactive_analyzer import InteractiveAnalyzer, check_interactive_requirements
                 
                 # Check if interactive mode is available
                 available, message = check_interactive_requirements()

@@ -10,6 +10,14 @@ import json
 class BurnoutDataTool(Tool):
     name = "burnout_data"
     description = "Get burnout analysis data for users, including risk scores and detailed metrics"
+    inputs = {
+        "query": {
+            "type": "string", 
+            "description": "Query to search burnout data (e.g., 'high risk users', 'user John Smith', 'statistics')",
+            "nullable": True
+        }
+    }
+    output_type = "string"
     
     def __init__(self, analysis_results: Dict[str, Any]):
         super().__init__()
@@ -20,8 +28,14 @@ class BurnoutDataTool(Tool):
         try:
             if not query or query.lower() in ["all", "summary"]:
                 return self._get_summary()
-            elif "high risk" in query.lower():
+            elif "high risk" in query.lower() or "high-risk" in query.lower():
                 return self._get_high_risk_users()
+            elif ("medium risk" in query.lower() or "medium-risk" in query.lower() or 
+                  ("medium" in query.lower() and "risk" in query.lower())):
+                return self._get_medium_risk_users()
+            elif ("low risk" in query.lower() or "low-risk" in query.lower() or
+                  ("low" in query.lower() and "risk" in query.lower())):
+                return self._get_low_risk_users()
             elif "user" in query.lower():
                 return self._search_users(query)
             elif "stats" in query.lower() or "statistics" in query.lower():
@@ -65,13 +79,56 @@ class BurnoutDataTool(Tool):
         
         result = "High Risk Users:\n"
         for user in high_risk:
+            key_metrics = user.get('key_metrics', {})
             result += f"\n- {user.get('user_name', 'Unknown')} (Score: {user.get('burnout_score', 0)}/10)\n"
-            result += f"  Incidents: {user.get('total_incidents', 0)}\n"
-            result += f"  After-hours %: {user.get('after_hours_percentage', 0)*100:.1f}%\n"
+            result += f"  Incidents: {key_metrics.get('total_incidents', 0)}\n"
+            result += f"  After-hours %: {key_metrics.get('after_hours_incidents', 0) / max(key_metrics.get('total_incidents', 1), 1) * 100:.1f}%\n"
             
             recommendations = user.get("recommendations", [])[:2]
             if recommendations:
                 result += f"  Top recommendations: {', '.join(recommendations)}\n"
+        
+        return result
+    
+    def _get_medium_risk_users(self) -> str:
+        """Get details of medium-risk users."""
+        individual = self.results.get("individual_analyses", [])
+        medium_risk = [a for a in individual if a.get("risk_level") == "medium"]
+        
+        if not medium_risk:
+            return "No medium-risk users found."
+        
+        result = "Medium Risk Users:\n"
+        for user in medium_risk:
+            key_metrics = user.get('key_metrics', {})
+            result += f"\n- {user.get('user_name', 'Unknown')} (Score: {user.get('burnout_score', 0)}/10)\n"
+            result += f"  Incidents: {key_metrics.get('total_incidents', 0)}\n"
+            result += f"  After-hours %: {key_metrics.get('after_hours_incidents', 0) / max(key_metrics.get('total_incidents', 1), 1) * 100:.1f}%\n"
+            
+            recommendations = user.get("recommendations", [])[:2]
+            if recommendations:
+                result += f"  Top recommendations: {', '.join(recommendations)}\n"
+        
+        return result
+    
+    def _get_low_risk_users(self) -> str:
+        """Get details of low-risk users."""
+        individual = self.results.get("individual_analyses", [])
+        low_risk = [a for a in individual if a.get("risk_level") == "low"]
+        
+        if not low_risk:
+            return "No low-risk users found."
+        
+        # Only show first 10 to avoid overwhelming output
+        result = f"Low Risk Users (showing first 10 of {len(low_risk)}):\n"
+        for user in low_risk[:10]:
+            key_metrics = user.get('key_metrics', {})
+            result += f"\n- {user.get('user_name', 'Unknown')} (Score: {user.get('burnout_score', 0)}/10)\n"
+            result += f"  Incidents: {key_metrics.get('total_incidents', 0)}\n"
+            result += f"  After-hours %: {key_metrics.get('after_hours_incidents', 0) / max(key_metrics.get('total_incidents', 1), 1) * 100:.1f}%\n"
+        
+        if len(low_risk) > 10:
+            result += f"\n... and {len(low_risk) - 10} more low-risk users."
         
         return result
     
@@ -98,12 +155,13 @@ class BurnoutDataTool(Tool):
         
         result = f"Found {len(matching_users)} matching user(s):\n"
         for user in matching_users:
+            key_metrics = user.get('key_metrics', {})
             result += f"\n{user.get('user_name', 'Unknown')}:\n"
             result += f"  Risk Level: {user.get('risk_level', 'unknown')}\n"
             result += f"  Burnout Score: {user.get('burnout_score', 0)}/10\n"
-            result += f"  Total Incidents: {user.get('total_incidents', 0)}\n"
-            result += f"  After Hours %: {user.get('after_hours_percentage', 0)*100:.1f}%\n"
-            result += f"  Avg Resolution Time: {user.get('avg_resolution_time_hours', 0):.1f} hours\n"
+            result += f"  Total Incidents: {key_metrics.get('total_incidents', 0)}\n"
+            result += f"  After Hours %: {key_metrics.get('after_hours_incidents', 0) / max(key_metrics.get('total_incidents', 1), 1) * 100:.1f}%\n"
+            result += f"  Avg Resolution Time: {key_metrics.get('avg_resolution_time_hours', 0):.1f} hours\n"
         
         return result
     
@@ -133,12 +191,20 @@ class BurnoutDataTool(Tool):
     
     def _search_general(self, query: str) -> str:
         """Handle general queries about the data."""
-        return f"I can help with burnout analysis data. Try asking about:\n- 'summary' or 'all' for overview\n- 'high risk' for high-risk users\n- 'user [name]' for specific users\n- 'statistics' for detailed stats\n\nYour query: '{query}'"
+        return f"I can help with burnout analysis data. Try asking about:\n- 'summary' or 'all' for overview\n- 'high risk' for high-risk users\n- 'medium risk' for medium-risk users\n- 'low risk' for low-risk users\n- 'user [name]' for specific users\n- 'statistics' for detailed stats\n\nYour query: '{query}'"
 
 
 class TrendAnalysisTool(Tool):
     name = "trend_analysis"
     description = "Analyze trends and patterns in burnout data over time"
+    inputs = {
+        "query": {
+            "type": "string",
+            "description": "Query about trends (e.g., 'incident patterns', 'risk factors', 'team patterns')",
+            "nullable": True
+        }
+    }
+    output_type = "string"
     
     def __init__(self, analysis_results: Dict[str, Any]):
         super().__init__()
@@ -250,6 +316,14 @@ Current data shows incident volume and after-hours work are key burnout drivers.
 class RecommendationTool(Tool):
     name = "recommendations"
     description = "Generate actionable recommendations for reducing burnout risk"
+    inputs = {
+        "query": {
+            "type": "string",
+            "description": "Query for recommendations (e.g., 'high risk users', 'team level', 'preventive measures')",
+            "nullable": True
+        }
+    }
+    output_type = "string"
     
     def __init__(self, analysis_results: Dict[str, Any]):
         super().__init__()

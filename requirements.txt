@@ -13,6 +13,7 @@ plotly>=5.17.0
 # Interactive mode dependencies (optional)
 smolagents>=0.1.0
 rich>=13.0.0
+litellm>=1.0.0
 
 # Development dependencies
 pytest>=7.4.0

@@ -4,6 +4,7 @@ Interactive burnout analysis using smolagents and LLMs.
 
 import os
 import sys
+import logging
 from typing import Any, Dict, List, Optional
 from rich.console import Console
 from rich.panel import Panel
@@ -11,12 +12,16 @@ from rich.prompt import Prompt
 from rich.table import Table
 from rich import print as rprint
 
+# Reduce LiteLLM logging noise
+logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 try:
-    from smolagents import CodeAgent, HfApiModel, OpenAIModel, AnthropicModel
-    from smolagents.default_tools import PythonInterpreterTool
+    from smolagents import CodeAgent, HfApiModel, OpenAIServerModel, LiteLLMModel, PythonInterpreterTool
     SMOLAGENTS_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     SMOLAGENTS_AVAILABLE = False
+    print(f"Import error: {e}")
 
 from burnout_tools import BurnoutDataTool, TrendAnalysisTool, RecommendationTool
 
@@ -92,9 +97,9 @@ class InteractiveAnalyzer:
         # Initialize the chosen model
         try:
             if model_type == "openai":
-                self.model = OpenAIModel("gpt-4")
+                self.model = LiteLLMModel("gpt-4")
             elif model_type == "anthropic":
-                self.model = AnthropicModel("claude-3-sonnet-20240229")
+                self.model = LiteLLMModel("claude-3-5-sonnet-20241022")
             elif model_type == "huggingface":
                 self.model = HfApiModel("microsoft/DialoGPT-large")
             
