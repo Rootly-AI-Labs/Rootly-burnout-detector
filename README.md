@@ -1,6 +1,11 @@
 # Rootly Burnout Detector
 
-A data-driven burnout detection system for on-call engineers using Rootly's incident data and Christina Maslach's Burnout Inventory research.
+A data-driven burnout detection system for on-call engineers using Rootly's incident data and Christina Maslach's Burnout Inventory research. The system connects to Rootly via the [Model Context Protocol (MCP)](https://github.com/Rootly-AI-Labs/Rootly-MCP-server/tree/main), enabling secure and efficient data retrieval.
+
+## Requirements
+
+- Python 3.12+
+- Rootly API token
 
 ## Quick Start
 
@@ -9,97 +14,47 @@ A data-driven burnout detection system for on-call engineers using Rootly's inci
    pip install -r requirements.txt
    ```
 
-2. **Configure Rootly API Token** (choose one method):
-   
-   **Option A: Environment Variable (Recommended)**
-   ```bash
-   export ROOTLY_API_TOKEN="your-rootly-api-token"
-   ```
-   
-   **Option B: secrets.env File (Secure)**
+2. **Configure Rootly API Token**
    ```bash
    cp secrets.env.example secrets.env
-   # Edit secrets.env with your token
    ```
    
-   **Option C: Command Line**
+   Edit `secrets.env` and add your Rootly API token:
    ```bash
-   python main.py --token "your-rootly-api-token" --days 30
+   ROOTLY_API_TOKEN=your-rootly-api-token-here
    ```
 
-3. **Install Local MCP Server**
-   ```bash
-   pip install rootly-mcp-server
-   ```
-
-4. **Run Analysis**
+3. **Run Analysis**
    
-   **Option A: Local MCP Server (Recommended)**
-   ```bash
-   python main.py --config config/config.local-pip.json --days 30
-   ```
-   
-   **Option B: uvx MCP Server**
+   **Remote MCP Server (Recommended)**
    ```bash
    python main.py --days 30
    ```
+   
+   **Local MCP Server (Optional)**
+   ```bash
+   # Install local server first
+   pip install rootly-mcp-server
+   python main.py --config config/config.local-pip.json --days 30
+   ```
 
-5. **Interactive Mode (Optional)**
+4. **Interactive Mode (Optional)**
    ```bash
    # Set LLM API key for Q&A mode
    export OPENAI_API_KEY="your-openai-key"  # or ANTHROPIC_API_KEY, HF_TOKEN
-   python main.py --config config/config.local-pip.json --days 30 --interactive
+   python main.py --days 30 --interactive
    ```
 
-6. **View Results**
+5. **View Results**
    ```bash
    open output/dashboard.html
    ```
-
-## Project Structure
-
-```
-rootly-burnout-detector/
-├── config/
-│   ├── config.json           # Analysis configuration
-│   └── config.example.json   # Example configuration
-├── src/
-│   ├── mcp_client.py         # MCP server connection
-│   ├── data_collector.py     # Data extraction from Rootly
-│   ├── burnout_analyzer.py   # Risk calculation engine
-│   └── dashboard.py          # HTML report generation
-├── output/
-│   ├── burnout_data.json     # Analysis results
-│   └── dashboard.html        # Interactive dashboard
-├── tests/
-│   └── test_*.py            # Unit tests
-├── requirements.txt          # Python dependencies
-└── main.py                  # Entry point
-```
-
-## Features
-
-- **Timezone-aware after-hours detection** (9 AM - 5 PM per engineer's timezone)
-- **Maslach Burnout Inventory inspired scoring** (Emotional Exhaustion, Depersonalization, Personal Accomplishment)
-- **Individual and team-level analysis**
-- **Configurable thresholds and parameters**
-- **Interactive HTML dashboard**
-- **JSON export for further analysis**
 
 ## Configuration
 
 ### Token Management
 
-**Security Levels (Best → Worst):**
-1. **Environment Variable** - Most secure, not stored in files
-2. **secrets.env File** - Git-ignored, team-friendly
-3. **Command Line** - Convenient but visible in process lists
-
-**Token Precedence:**
-1. `--token` command line flag (highest priority)
-2. `ROOTLY_API_TOKEN` environment variable  
-3. `secrets.env` file
-4. `.env` file (lowest priority)
+The Rootly API token is configured in the `secrets.env` file as shown in the Quick Start section above. The token can also be provided via environment variable or command line flag if needed.
 
 ### Analysis Settings
 
@@ -116,6 +71,42 @@ For interactive Q&A mode, set one LLM API key:
 - `OPENAI_API_KEY` - GPT-4 (paid, high quality)
 - `ANTHROPIC_API_KEY` - Claude (paid, high quality)  
 - `HF_TOKEN` - Hugging Face (free tier available)
+
+## Project Structure
+
+```
+rootly-burnout-detector/
+├── config/
+│   ├── config.json           # Default (uvx/remote) configuration
+│   ├── config.local-pip.json # Local MCP server configuration
+│   └── config.example.json   # Example configuration
+├── src/
+│   ├── mcp_client.py         # MCP server connection
+│   ├── data_collector.py     # Data extraction from Rootly
+│   ├── burnout_analyzer.py   # Risk calculation engine
+│   ├── dashboard.py          # HTML report generation
+│   ├── interactive_analyzer.py # LLM-powered Q&A interface
+│   └── burnout_tools.py      # Custom smolagents tools
+├── output/
+│   ├── burnout_analysis.json # Analysis results
+│   ├── dashboard.html        # Interactive dashboard
+│   ├── summary_report.txt    # Text summary
+│   └── individual_reports/   # Per-user detailed reports
+├── secrets.env               # API tokens (git-ignored)
+├── secrets.env.example       # Example secrets file
+├── requirements.txt          # Python dependencies
+└── main.py                  # Entry point
+```
+
+## Features
+
+- **Timezone-aware after-hours detection** (9 AM - 5 PM per engineer's timezone)
+- **Maslach Burnout Inventory inspired scoring** (Emotional Exhaustion, Depersonalization, Personal Accomplishment)
+- **Individual and team-level analysis**
+- **Configurable thresholds and parameters**
+- **Interactive HTML dashboard**
+- **JSON export for further analysis**
+
 
 ## Burnout Metrics
 
@@ -146,18 +137,12 @@ For interactive Q&A mode, set one LLM API key:
 
 The tool supports two MCP server configurations:
 
-### Local MCP Server (Recommended)
-- Faster and more reliable
+### Remote MCP Server (Recommended)
+- Uses uvx to connect to remotely hosted MCP server
+- Default configuration
+- No additional installation required
+
+### Local MCP Server (Optional)
+- Faster and more reliable for heavy usage
 - Requires `pip install rootly-mcp-server`
 - Use: `--config config/config.local-pip.json`
-
-### uvx MCP Server
-- Uses uvx to manage the MCP server
-- Default configuration
-- May have parameter compatibility issues
-
-## Requirements
-
-- Python 3.12+
-- Rootly API token
-- rootly-mcp-server (for local mode)
