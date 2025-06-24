@@ -76,29 +76,28 @@ class RootlyMCPClient:
             raise RuntimeError("Not connected to MCP server")
         
         try:
-            # Check if this is a local server that needs kwargs parameter
-            tools = await self.session.list_tools()
-            users_tool = next((t for t in tools.tools if t.name == "users_get"), None)
+            # Call users_get tool (uvx-installed server requires kwargs parameter)
+            result = await self.session.call_tool("users_get", {"kwargs": "{}"})
             
-            if users_tool and users_tool.inputSchema:
-                required = users_tool.inputSchema.get("required", [])
-                if "kwargs" in required:
-                    # Local MCP server format - needs kwargs as string
-                    result = await self.session.call_tool("users_get", {"kwargs": "{}"})
+            if result.content and len(result.content) > 0:
+                content_text = result.content[0].text
+                if content_text.strip():
+                    data = json.loads(content_text)
+                    return data.get("data", [])
                 else:
-                    # Hosted MCP server format - empty object
-                    result = await self.session.call_tool("users_get", {})
+                    logger.warning("Empty response from users_get tool")
+                    return []
             else:
-                # Fallback to empty object
-                result = await self.session.call_tool("users_get", {})
-            
-            if result.content:
-                data = json.loads(result.content[0].text)
-                return data.get("data", [])
-            return []
+                logger.warning("No content in response from users_get tool")
+                return []
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error fetching users: {e}")
+            if 'result' in locals() and result.content:
+                logger.error(f"Raw response: {result.content[0].text[:500]}")
+            raise RuntimeError(f"Failed to parse users response from Rootly API: {e}")
         except Exception as e:
             logger.error(f"Error fetching users: {e}")
-            return []
+            raise RuntimeError(f"Failed to fetch users from Rootly: {e}")
     
     async def get_incidents(
         self, 
@@ -111,29 +110,28 @@ class RootlyMCPClient:
             raise RuntimeError("Not connected to MCP server")
         
         try:
-            # Check if this is a local server that needs kwargs parameter
-            tools = await self.session.list_tools()
-            incidents_tool = next((t for t in tools.tools if t.name == "incidents_get"), None)
+            # Call incidents_get tool (uvx-installed server requires kwargs parameter)
+            result = await self.session.call_tool("incidents_get", {"kwargs": "{}"})
             
-            if incidents_tool and incidents_tool.inputSchema:
-                required = incidents_tool.inputSchema.get("required", [])
-                if "kwargs" in required:
-                    # Local MCP server format - needs kwargs as string
-                    result = await self.session.call_tool("incidents_get", {"kwargs": "{}"})
+            if result.content and len(result.content) > 0:
+                content_text = result.content[0].text
+                if content_text.strip():
+                    data = json.loads(content_text)
+                    return data.get("data", [])
                 else:
-                    # Hosted MCP server format - empty object
-                    result = await self.session.call_tool("incidents_get", {})
+                    logger.warning("Empty response from incidents_get tool")
+                    return []
             else:
-                # Fallback to empty object
-                result = await self.session.call_tool("incidents_get", {})
-            
-            if result.content:
-                data = json.loads(result.content[0].text)
-                return data.get("data", [])
-            return []
+                logger.warning("No content in response from incidents_get tool")
+                return []
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error fetching incidents: {e}")
+            if 'result' in locals() and result.content:
+                logger.error(f"Raw response: {result.content[0].text[:500]}")
+            raise RuntimeError(f"Failed to parse incidents response from Rootly API: {e}")
         except Exception as e:
             logger.error(f"Error fetching incidents: {e}")
-            return []
+            raise RuntimeError(f"Failed to fetch incidents from Rootly: {e}")
     
     async def get_all_incidents(self, days_back: int = 30) -> List[Dict[str, Any]]:
         """Fetch all incidents with pagination."""
@@ -185,8 +183,21 @@ async def test_connection(config: Dict[str, Any]) -> bool:
             tools = await session.list_tools()
             print(f"Connected successfully. Available tools: {len(tools.tools)}")
             return True
+    except FileNotFoundError as e:
+        if "uvx" in str(e):
+            print("Connection failed: uvx not found")
+            print("\nPlease install uv package manager:")
+            print("  brew install uv")
+            print("  # or follow https://docs.astral.sh/uv/getting-started/installation/")
+        else:
+            print(f"Connection failed: {e}")
+        return False
     except Exception as e:
         print(f"Connection failed: {e}")
+        print("\nPossible solutions:")
+        print("- Check your ROOTLY_API_TOKEN is set correctly")
+        print("- Verify internet connectivity")
+        print("- Try running with --debug for more details")
         return False
 
 

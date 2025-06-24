@@ -223,22 +223,7 @@ async def main():
     
     # Set up authentication for MCP server
     if os.environ.get("ROOTLY_API_TOKEN"):
-        # Check if using hosted MCP server (needs AUTH_HEADER) or local server (direct token)
-        config_preview_path = Path(args.config)
-        if config_preview_path.exists():
-            with open(config_preview_path) as f:
-                config_preview = json.load(f)
-            
-            mcp_args = config_preview.get("mcp_server", {}).get("args", [])
-            if "mcp-remote" in str(mcp_args):
-                # Hosted MCP server - needs Bearer header
-                os.environ["ROOTLY_AUTH_HEADER"] = f"Bearer {os.environ['ROOTLY_API_TOKEN']}"
-                print("✓ Hosted MCP server authentication configured")
-            else:
-                # Local MCP server - uses token directly
-                print("✓ Local MCP server authentication configured")
-        else:
-            print("✓ Rootly authentication configured")
+        print("✓ Rootly authentication configured")
     
     # Load configuration
     config = load_config(args.config)
@@ -262,7 +247,27 @@ async def main():
         # Data collection
         print("Collecting data from Rootly...")
         collector = RootlyDataCollector(config)
-        raw_data = await collector.collect_all_data()
+        
+        try:
+            raw_data = await collector.collect_all_data()
+        except (RuntimeError, Exception) as e:
+            # Extract the root cause from nested exception groups
+            error_msg = str(e)
+            if "Failed to fetch users from Rootly" in error_msg:
+                print(f"\n❌ Failed to fetch users from Rootly. Check your API token and MCP server connection.")
+            elif "TaskGroup" in error_msg and "401" in error_msg:
+                print(f"\n❌ Authentication failed (401 Unauthorized). Your Rootly API token is invalid or expired.")
+            elif "TaskGroup" in error_msg:
+                print(f"\n❌ Connection to Rootly failed. Check your network connection and API token.")
+            else:
+                print(f"\n❌ Error: {error_msg}")
+            
+            print("\nPossible solutions:")
+            print("- Check your ROOTLY_API_TOKEN is valid")
+            print("- Verify you have access to the Rootly organization")
+            print("- Check your network connection")
+            print("- Try running with --debug for more details")
+            sys.exit(1)
         
         print(f"Collected {len(raw_data['users'])} users and {len(raw_data['incidents'])} incidents")
         

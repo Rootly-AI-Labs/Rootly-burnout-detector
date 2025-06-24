@@ -5,6 +5,7 @@ A data-driven burnout detection system for on-call engineers using Rootly's inci
 ## Requirements
 
 - Python 3.12+
+- uv package manager (`brew install uv` or see [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/))
 - Rootly API token
 
 ## Quick Start
@@ -25,17 +26,8 @@ A data-driven burnout detection system for on-call engineers using Rootly's inci
    ```
 
 3. **Run Analysis**
-   
-   **Remote MCP Server (Recommended)**
    ```bash
    python main.py --days 30
-   ```
-   
-   **Local MCP Server (Optional)**
-   ```bash
-   # Install local server first
-   pip install rootly-mcp-server
-   python main.py --config config/config.local-pip.json --days 30
    ```
 
 4. **Interactive Mode (Optional)**
@@ -77,8 +69,7 @@ For interactive Q&A mode, set one LLM API key:
 ```
 rootly-burnout-detector/
 ├── config/
-│   ├── config.json           # Default (uvx/remote) configuration
-│   ├── config.local-pip.json # Local MCP server configuration
+│   ├── config.json           # Default configuration
 │   └── config.example.json   # Example configuration
 ├── src/
 │   ├── mcp_client.py         # MCP server connection
@@ -133,19 +124,14 @@ rootly-burnout-detector/
 - **Trend Analysis**: Changes over time
 - **Actionable Recommendations**: Suggested interventions
 
-## MCP Server Options
+## MCP Server
 
-The tool supports two MCP server configurations:
+The tool uses uvx to automatically download and run the Rootly MCP server:
 
-### Remote MCP Server (Recommended)
-- Uses uvx to connect to remotely hosted MCP server
-- Default configuration
-- No additional installation required
-
-### Local MCP Server (Optional)
-- Faster and more reliable for heavy usage
-- Requires `pip install rootly-mcp-server`
-- Use: `--config config/config.local-pip.json`
+- **Automatic setup**: No manual installation required
+- **Always latest**: Gets the most recent version automatically  
+- **Clean environment**: Uses temporary isolated environment
+- **No conflicts**: Doesn't interfere with your Python packages
 
 ## How Burnout Scores Are Calculated
 

@@ -33,6 +33,13 @@ class RootlyDataCollector:
             days_to_analyze = self.analysis_config.get("days_to_analyze", 30)
             incidents = await self.client.get_all_incidents(days_back=days_to_analyze)
             
+            # Validate data collection succeeded
+            if len(users) == 0:
+                raise RuntimeError("❌ Failed to fetch users from Rootly. Check your API token and MCP server connection.")
+            
+            if len(incidents) == 0:
+                logger.warning(f"⚠️  No incidents found in the last {days_to_analyze} days. This may be normal for quiet periods.")
+            
             logger.info(f"Collected {len(users)} users, {len(incidents)} incidents")
             
             # Process and enrich data
