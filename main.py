@@ -142,12 +142,21 @@ def generate_summary_report(results: Dict[str, Any], output_dir: str):
             high_count = sum(1 for a in individual_analyses if a.get("risk_level") == "high")
             medium_count = sum(1 for a in individual_analyses if a.get("risk_level") == "medium")
             low_count = sum(1 for a in individual_analyses if a.get("risk_level") == "low")
-            scores = [a.get("burnout_score", 0) for a in individual_analyses]
-            avg_score = sum(scores) / len(scores) if scores else 0
+            
+            # Separate active on-call users from all users
+            active_users = [a for a in individual_analyses if a.get("analysis_period", {}).get("incident_count", 0) > 0]
+            all_scores = [a.get("burnout_score", 0) for a in individual_analyses]
+            active_scores = [a.get("burnout_score", 0) for a in active_users]
+            
+            avg_score_all = sum(all_scores) / len(all_scores) if all_scores else 0
+            avg_score_active = sum(active_scores) / len(active_scores) if active_scores else 0
+            
             f.write(f"High Risk: {high_count} users\n")
             f.write(f"Medium Risk: {medium_count} users\n")
             f.write(f"Low Risk: {low_count} users\n")
-            f.write(f"Average Score: {avg_score:.2f}/10\n\n")
+            f.write(f"Average Score (All Users): {avg_score_all:.2f}/10\n")
+            f.write(f"Average Score (Active On-Call): {avg_score_active:.2f}/10 ({len(active_users)} users)\n")
+            f.write(f"Users with Zero Incidents: {len(individual_analyses) - len(active_users)} users\n\n")
         
         # High-risk users
         high_risk_users = [
@@ -325,12 +334,20 @@ async def main():
             high_count = sum(1 for a in individual_analyses if a.get("risk_level") == "high")
             medium_count = sum(1 for a in individual_analyses if a.get("risk_level") == "medium")
             low_count = sum(1 for a in individual_analyses if a.get("risk_level") == "low")
-            scores = [a.get("burnout_score", 0) for a in individual_analyses]
-            avg_score = sum(scores) / len(scores) if scores else 0
+            
+            # Separate active on-call users from all users
+            active_users = [a for a in individual_analyses if a.get("analysis_period", {}).get("incident_count", 0) > 0]
+            all_scores = [a.get("burnout_score", 0) for a in individual_analyses]
+            active_scores = [a.get("burnout_score", 0) for a in active_users]
+            
+            avg_score_all = sum(all_scores) / len(all_scores) if all_scores else 0
+            avg_score_active = sum(active_scores) / len(active_scores) if active_scores else 0
+            
             print(f"High risk: {high_count}")
             print(f"Medium risk: {medium_count}")
             print(f"Low risk: {low_count}")
-            print(f"Average score: {avg_score:.2f}/10")
+            print(f"Average score (all): {avg_score_all:.2f}/10")
+            print(f"Average score (active on-call): {avg_score_active:.2f}/10 ({len(active_users)} users)")
         else:
             print("No users analyzed")
         
