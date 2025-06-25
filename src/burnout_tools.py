@@ -2,9 +2,8 @@
 Custom smolagents tools for burnout analysis data access.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 from smolagents import Tool
-import json
 
 
 class BurnoutDataTool(Tool):

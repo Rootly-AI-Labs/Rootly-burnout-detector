@@ -6,7 +6,6 @@ import asyncio
 import json
 import logging
 import os
-import subprocess
 from typing import Any, Dict, List, Optional
 from contextlib import asynccontextmanager
 
@@ -241,7 +240,6 @@ async def test_connection(config: Dict[str, Any]) -> bool:
 
 if __name__ == "__main__":
     # Test the MCP client
-    import json
     
     # Load config
     config_path = "../config/config.example.json"
