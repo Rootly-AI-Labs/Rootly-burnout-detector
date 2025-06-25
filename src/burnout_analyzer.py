@@ -3,8 +3,8 @@ Burnout risk analysis engine based on Christina Maslach's research.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Tuple
+from datetime import datetime
+from typing import Any, Dict, List
 import pytz
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,8 @@ class BurnoutAnalyzer:
         self, 
         user: Dict[str, Any], 
         user_incidents: List[str],
-        all_incidents: List[Dict[str, Any]]
+        all_incidents: List[Dict[str, Any]],
+        github_activity: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Calculate comprehensive burnout risk for a single user."""
         
@@ -34,9 +35,9 @@ class BurnoutAnalyzer:
             return self._create_empty_analysis(user)
         
         # Calculate the three Maslach dimensions
-        emotional_exhaustion = self._calculate_emotional_exhaustion(user, incidents)
-        depersonalization = self._calculate_depersonalization(user, incidents)
-        personal_accomplishment = self._calculate_personal_accomplishment(user, incidents)
+        emotional_exhaustion = self._calculate_emotional_exhaustion(user, incidents, github_activity)
+        depersonalization = self._calculate_depersonalization(user, incidents, github_activity)
+        personal_accomplishment = self._calculate_personal_accomplishment(user, incidents, github_activity)
         
         # Calculate overall burnout score
         weights = self.scoring
@@ -77,7 +78,8 @@ class BurnoutAnalyzer:
     def _calculate_emotional_exhaustion(
         self, 
         user: Dict[str, Any], 
-        incidents: List[Dict[str, Any]]
+        incidents: List[Dict[str, Any]],
+        github_activity: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Calculate emotional exhaustion indicators."""
         
@@ -114,26 +116,64 @@ class BurnoutAnalyzer:
                            self.thresholds.get("avg_resolution_time_hours_high", 4) * 10)
         cluster_score = min(10, clustered_incidents / len(incidents) * 20) if incidents else 0
         
-        overall_score = (frequency_score + after_hours_score + duration_score + cluster_score) / 4
+        # GitHub metrics integration (if available)
+        github_score = 0
+        github_indicators = {}
+        if github_activity and self.config.get('github_integration', {}).get('enabled', False):
+            github_metrics = github_activity.get('metrics', {})
+            
+            # After-hours coding work contributes to exhaustion
+            github_after_hours_pct = github_metrics.get('after_hours_commit_percentage', 0)
+            github_weekend_pct = github_metrics.get('weekend_commit_percentage', 0)
+            github_clustered_commits = github_metrics.get('clustered_commits', 0)
+            total_commits = github_metrics.get('total_commits', 0)
+            
+            # Calculate GitHub exhaustion indicators
+            github_after_hours_score = min(10, github_after_hours_pct / 0.4 * 10)  # 40% threshold
+            github_weekend_score = min(10, github_weekend_pct / 0.2 * 10)  # 20% threshold  
+            github_cluster_ratio = (github_clustered_commits / total_commits) if total_commits > 0 else 0
+            github_cluster_score = min(10, github_cluster_ratio * 15)  # Clustering indicates stress
+            
+            github_score = (github_after_hours_score + github_weekend_score + github_cluster_score) / 3
+            github_indicators = {
+                'github_after_hours_percentage': round(github_after_hours_pct, 2),
+                'github_weekend_percentage': round(github_weekend_pct, 2),
+                'github_clustered_commits_ratio': round(github_cluster_ratio, 2),
+                'github_total_commits': total_commits
+            }
+        
+        # Combine scores - if GitHub is available, weight it at 30% vs 70% for incidents
+        if github_activity and self.config.get('github_integration', {}).get('enabled', False):
+            incident_component = (frequency_score + after_hours_score + duration_score + cluster_score) / 4
+            overall_score = (incident_component * 0.7) + (github_score * 0.3)
+        else:
+            overall_score = (frequency_score + after_hours_score + duration_score + cluster_score) / 4
+        
+        indicators = {
+            "incidents_per_week": round(incidents_per_week, 2),
+            "after_hours_percentage": round(after_hours_percentage, 2),
+            "avg_resolution_hours": round(avg_resolution_hours, 2),
+            "clustered_incidents": clustered_incidents,
+            "severity_weighted_load": round(severity_weight, 2)
+        }
+        
+        # Add GitHub indicators if available
+        if github_indicators:
+            indicators.update(github_indicators)
         
         return {
             "score": round(overall_score, 2),
-            "indicators": {
-                "incidents_per_week": round(incidents_per_week, 2),
-                "after_hours_percentage": round(after_hours_percentage, 2),
-                "avg_resolution_hours": round(avg_resolution_hours, 2),
-                "clustered_incidents": clustered_incidents,
-                "severity_weighted_load": round(severity_weight, 2)
-            },
+            "indicators": indicators,
             "contributing_factors": self._identify_exhaustion_factors(
-                frequency_score, after_hours_score, duration_score, cluster_score
+                frequency_score, after_hours_score, duration_score, cluster_score, github_score
             )
         }
     
     def _calculate_depersonalization(
         self, 
         user: Dict[str, Any], 
-        incidents: List[Dict[str, Any]]
+        incidents: List[Dict[str, Any]],
+        github_activity: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Calculate depersonalization indicators."""
         
@@ -165,25 +205,71 @@ class BurnoutAnalyzer:
         degradation_score = max(0, response_degradation * 10)  # Positive degradation = bad
         communication_score = max(0, 10 - (avg_resolution_length / 50))  # Shorter = worse
         
-        overall_score = (escalation_score + solo_score + degradation_score + communication_score) / 4
+        # GitHub metrics for depersonalization (repository switching, reduced collaboration)
+        github_score = 0
+        github_indicators = {}
+        if github_activity and self.config.get('github_integration', {}).get('enabled', False):
+            github_metrics = github_activity.get('metrics', {})
+            
+            # Repository switching can indicate disengagement or scattered focus
+            repos_touched = github_metrics.get('repositories_touched', 0)
+            total_commits = github_metrics.get('total_commits', 0)
+            total_prs = github_metrics.get('total_pull_requests', 0)
+            
+            # High repo switching relative to activity suggests scattered focus
+            if total_commits > 0:
+                repo_switching_ratio = repos_touched / total_commits
+                repo_switching_score = min(10, repo_switching_ratio * 20)  # Higher = worse
+            else:
+                repo_switching_score = 0
+                repo_switching_ratio = 0
+            
+            # Low PR creation relative to commits suggests reduced collaboration
+            if total_commits > 0:
+                pr_ratio = total_prs / total_commits
+                collaboration_score = max(0, 10 - (pr_ratio * 30))  # Lower PR ratio = worse
+            else:
+                pr_ratio = 0
+                collaboration_score = 5
+            
+            github_score = (repo_switching_score + collaboration_score) / 2
+            github_indicators = {
+                'github_repo_switching_ratio': round(repo_switching_ratio, 3),
+                'github_pr_to_commit_ratio': round(pr_ratio, 3),
+                'github_repositories_touched': repos_touched
+            }
+        
+        # Combine scores
+        if github_activity and self.config.get('github_integration', {}).get('enabled', False):
+            incident_component = (escalation_score + solo_score + degradation_score + communication_score) / 4
+            overall_score = (incident_component * 0.7) + (github_score * 0.3)
+        else:
+            overall_score = (escalation_score + solo_score + degradation_score + communication_score) / 4
+        
+        indicators = {
+            "escalation_rate": round(escalation_rate, 2),
+            "solo_incident_rate": round(solo_rate, 2),
+            "response_time_trend": round(response_degradation, 2),
+            "avg_resolution_message_length": round(avg_resolution_length, 1)
+        }
+        
+        # Add GitHub indicators if available
+        if github_indicators:
+            indicators.update(github_indicators)
         
         return {
             "score": round(overall_score, 2),
-            "indicators": {
-                "escalation_rate": round(escalation_rate, 2),
-                "solo_incident_rate": round(solo_rate, 2),
-                "response_time_trend": round(response_degradation, 2),
-                "avg_resolution_message_length": round(avg_resolution_length, 1)
-            },
+            "indicators": indicators,
             "contributing_factors": self._identify_depersonalization_factors(
-                escalation_score, solo_score, degradation_score, communication_score
+                escalation_score, solo_score, degradation_score, communication_score, github_score
             )
         }
     
     def _calculate_personal_accomplishment(
         self, 
         user: Dict[str, Any], 
-        incidents: List[Dict[str, Any]]
+        incidents: List[Dict[str, Any]],
+        github_activity: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Calculate personal accomplishment indicators (higher score = better)."""
         
@@ -207,18 +293,62 @@ class BurnoutAnalyzer:
         success_score = resolution_rate * 10
         improvement_score = max(0, 10 + (resolution_improvement * 10))  # Negative improvement = good
         
-        overall_score = (success_score + improvement_score + complexity_score + knowledge_sharing_score) / 4
+        # GitHub metrics for personal accomplishment (productive activity, completed work)
+        github_score = 5  # Default neutral score
+        github_indicators = {}
+        if github_activity and self.config.get('github_integration', {}).get('enabled', False):
+            github_metrics = github_activity.get('metrics', {})
+            
+            # Regular productive activity indicates accomplishment
+            commits_per_week = github_metrics.get('commits_per_week', 0)
+            prs_per_week = github_metrics.get('prs_per_week', 0)
+            total_commits = github_metrics.get('total_commits', 0)
+            
+            # Productive activity scoring (balanced workload is good)
+            if commits_per_week > 0:
+                # Sweet spot around 3-8 commits per week for sustainable productivity
+                if 3 <= commits_per_week <= 8:
+                    activity_score = 10
+                elif commits_per_week < 3:
+                    activity_score = (commits_per_week / 3) * 7  # Lower activity = lower accomplishment
+                else:
+                    activity_score = max(5, 10 - ((commits_per_week - 8) * 0.5))  # Excessive activity = potential burnout
+            else:
+                activity_score = 0
+            
+            # PR creation indicates collaborative accomplishment
+            pr_score = min(10, prs_per_week * 5)  # 2 PRs per week = max score
+            
+            github_score = (activity_score + pr_score) / 2
+            github_indicators = {
+                'github_commits_per_week': round(commits_per_week, 2),
+                'github_prs_per_week': round(prs_per_week, 2),
+                'github_productivity_score': round(github_score, 2)
+            }
+        
+        # Combine scores
+        if github_activity and self.config.get('github_integration', {}).get('enabled', False):
+            incident_component = (success_score + improvement_score + complexity_score + knowledge_sharing_score) / 4
+            overall_score = (incident_component * 0.7) + (github_score * 0.3)
+        else:
+            overall_score = (success_score + improvement_score + complexity_score + knowledge_sharing_score) / 4
+        
+        indicators = {
+            "resolution_success_rate": round(resolution_rate, 2),
+            "resolution_time_improvement": round(resolution_improvement, 2),
+            "complexity_handling_score": round(complexity_score, 2),
+            "knowledge_sharing_score": round(knowledge_sharing_score, 2)
+        }
+        
+        # Add GitHub indicators if available
+        if github_indicators:
+            indicators.update(github_indicators)
         
         return {
             "score": round(overall_score, 2),
-            "indicators": {
-                "resolution_success_rate": round(resolution_rate, 2),
-                "resolution_time_improvement": round(resolution_improvement, 2),
-                "complexity_handling_score": round(complexity_score, 2),
-                "knowledge_sharing_score": round(knowledge_sharing_score, 2)
-            },
+            "indicators": indicators,
             "contributing_factors": self._identify_accomplishment_factors(
-                success_score, improvement_score, complexity_score, knowledge_sharing_score
+                success_score, improvement_score, complexity_score, knowledge_sharing_score, github_score
             )
         }
     
@@ -457,31 +587,34 @@ class BurnoutAnalyzer:
         
         return recommendations
     
-    def _identify_exhaustion_factors(self, freq: float, after_hrs: float, duration: float, cluster: float) -> List[str]:
+    def _identify_exhaustion_factors(self, freq: float, after_hrs: float, duration: float, cluster: float, github_score: float = 0) -> List[str]:
         """Identify specific contributing factors to emotional exhaustion."""
         factors = []
         if freq >= 7: factors.append("High incident frequency")
         if after_hrs >= 7: factors.append("Excessive after-hours work")
         if duration >= 7: factors.append("Long resolution times")
         if cluster >= 7: factors.append("Incident clustering")
+        if github_score >= 7: factors.append("High after-hours coding activity")
         return factors
     
-    def _identify_depersonalization_factors(self, esc: float, solo: float, deg: float, comm: float) -> List[str]:
+    def _identify_depersonalization_factors(self, esc: float, solo: float, deg: float, comm: float, github_score: float = 0) -> List[str]:
         """Identify specific contributing factors to depersonalization."""
         factors = []
         if esc >= 7: factors.append("High escalation rate")
         if solo >= 7: factors.append("Too many solo incidents")
         if deg >= 7: factors.append("Declining response times")
         if comm >= 7: factors.append("Poor communication patterns")
+        if github_score >= 7: factors.append("Scattered repository focus or reduced code collaboration")
         return factors
     
-    def _identify_accomplishment_factors(self, success: float, improve: float, complex: float, share: float) -> List[str]:
+    def _identify_accomplishment_factors(self, success: float, improve: float, complex: float, share: float, github_score: float = 5) -> List[str]:
         """Identify factors affecting personal accomplishment."""
         factors = []
         if success <= 3: factors.append("Low resolution success rate")
         if improve <= 3: factors.append("No improvement in resolution times")
         if complex <= 3: factors.append("Limited complex incident exposure")
         if share <= 3: factors.append("Minimal knowledge sharing")
+        if github_score <= 3: factors.append("Low productive coding activity")
         return factors
     
     def _create_empty_analysis(self, user: Dict[str, Any]) -> Dict[str, Any]:

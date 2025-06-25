@@ -3,7 +3,6 @@ Dashboard generator for burnout analysis results.
 """
 
 import json
-import os
 from typing import Dict, Any, List
 from pathlib import Path
 from datetime import datetime
@@ -98,6 +97,7 @@ class BurnoutDashboard:
             border-radius: 8px;
             margin-bottom: 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            height: 350px;
         }}
         .user-list {{
             background: white;
@@ -226,7 +226,7 @@ class BurnoutDashboard:
             <p class="timestamp">Analysis completed: {formatted_timestamp}</p>
             <p>Period: {metadata.get('days_analyzed', 'N/A')} days | 
                Users: {metadata.get('total_users_analyzed', 'N/A')} | 
-               Incidents: {metadata.get('total_incidents', 'N/A')}</p>
+               Incidents: {metadata.get('total_incidents', 'N/A')}{self._get_github_integration_status(metadata)}</p>
             
             <div style="margin-top: 15px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; border-left: 4px solid #007bff;">
                 <h4 style="margin: 0 0 10px 0; color: #495057;">How Burnout Scores Are Calculated</h4>
@@ -261,7 +261,7 @@ class BurnoutDashboard:
         
         <div class="chart-container">
             <h3>Burnout Scores by User</h3>
-            <canvas id="scoresChart" width="400" height="200"></canvas>
+            <canvas id="scoresChart" width="400" height="150"></canvas>
         </div>
         
         <div class="user-list">
@@ -285,15 +285,25 @@ class BurnoutDashboard:
             }},
             options: {{
                 responsive: true,
+                maintainAspectRatio: false,
                 scales: {{
                     y: {{
                         beginAtZero: true,
-                        max: 10
+                        max: 10,
+                        ticks: {{
+                            stepSize: 2
+                        }}
                     }}
                 }},
                 plugins: {{
                     legend: {{
                         display: false
+                    }}
+                }},
+                layout: {{
+                    padding: {{
+                        top: 10,
+                        bottom: 10
                     }}
                 }}
             }}
@@ -478,6 +488,8 @@ class BurnoutDashboard:
                 <span><strong>{personal_accomplishment:.2f}/10</strong></span>
             </div>
         </div>
+        
+        {self._generate_github_metrics_section(dimensions)}
         """
         
         return details_html
@@ -492,6 +504,87 @@ class BurnoutDashboard:
             return 0.0
         scores = [analysis.get('burnout_score', 0) for analysis in analyses]
         return round(sum(scores) / len(scores), 2)
+    
+    def _get_github_integration_status(self, metadata: Dict[str, Any]) -> str:
+        """Get GitHub integration status display text."""
+        config = metadata.get('config_used', {})
+        github_config = config.get('github_integration', {})
+        
+        if github_config.get('enabled', False):
+            return ' | <span style="color: #28a745;">✓ GitHub Integration Enabled</span>'
+        else:
+            return ''
+    
+    def _generate_github_metrics_section(self, dimensions: Dict[str, Any]) -> str:
+        """Generate GitHub metrics section if GitHub data is available."""
+        # Check if any dimension has GitHub indicators
+        has_github_data = False
+        github_metrics = {}
+        
+        for dimension_name, dimension_data in dimensions.items():
+            indicators = dimension_data.get('indicators', {})
+            for key, value in indicators.items():
+                if key.startswith('github_') and value is not None:
+                    has_github_data = True
+                    github_metrics[key] = value
+        
+        if not has_github_data:
+            return ""
+        
+        # Format GitHub metrics for display
+        html = """
+        <div class="detail-section">
+            <div class="detail-label">💻 GitHub Activity Metrics</div>"""
+        
+        # Add relevant GitHub metrics
+        if 'github_total_commits' in github_metrics:
+            html += f"""
+            <div class="metric-row">
+                <span>Total Commits:</span>
+                <span><strong>{github_metrics['github_total_commits']}</strong></span>
+            </div>"""
+        
+        if 'github_after_hours_percentage' in github_metrics:
+            percentage = github_metrics['github_after_hours_percentage'] * 100 if github_metrics['github_after_hours_percentage'] else 0
+            html += f"""
+            <div class="metric-row">
+                <span>After-Hours Commits:</span>
+                <span><strong>{percentage:.1f}%</strong></span>
+            </div>"""
+        
+        if 'github_weekend_percentage' in github_metrics:
+            percentage = github_metrics['github_weekend_percentage'] * 100 if github_metrics['github_weekend_percentage'] else 0
+            html += f"""
+            <div class="metric-row">
+                <span>Weekend Commits:</span>
+                <span><strong>{percentage:.1f}%</strong></span>
+            </div>"""
+        
+        if 'github_commits_per_week' in github_metrics:
+            html += f"""
+            <div class="metric-row">
+                <span>Commits/Week:</span>
+                <span><strong>{github_metrics['github_commits_per_week']:.1f}</strong></span>
+            </div>"""
+        
+        if 'github_prs_per_week' in github_metrics:
+            html += f"""
+            <div class="metric-row">
+                <span>PRs/Week:</span>
+                <span><strong>{github_metrics['github_prs_per_week']:.1f}</strong></span>
+            </div>"""
+        
+        if 'github_repositories_touched' in github_metrics:
+            html += f"""
+            <div class="metric-row">
+                <span>Repositories Worked On:</span>
+                <span><strong>{github_metrics['github_repositories_touched']}</strong></span>
+            </div>"""
+        
+        html += """
+        </div>"""
+        
+        return html
 
 
 def generate_dashboard_from_file(results_file: str, output_file: str):

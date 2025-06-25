@@ -68,3 +68,6 @@ logs/
 *.tmp
 *.temp
 .cache/
+
+# GitHub integration cache
+.github_cache/

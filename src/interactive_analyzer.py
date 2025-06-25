@@ -3,21 +3,19 @@ Interactive burnout analysis using smolagents and LLMs.
 """
 
 import os
-import sys
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
-from rich import print as rprint
 
 # Reduce LiteLLM logging noise
 logging.getLogger("LiteLLM").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 try:
-    from smolagents import CodeAgent, HfApiModel, OpenAIServerModel, LiteLLMModel, PythonInterpreterTool
+    from smolagents import CodeAgent, HfApiModel, LiteLLMModel, PythonInterpreterTool
     SMOLAGENTS_AVAILABLE = True
 except ImportError as e:
     SMOLAGENTS_AVAILABLE = False

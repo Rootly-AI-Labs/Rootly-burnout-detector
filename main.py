@@ -50,6 +50,8 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from data_collector import RootlyDataCollector
 from burnout_analyzer import BurnoutAnalyzer
 from dashboard import BurnoutDashboard
+from github_correlator import GitHubCorrelator
+from github_collector import GitHubCollector
 
 
 def setup_logging(debug: bool = False):
@@ -215,6 +217,16 @@ async def main():
         type=str,
         help="Rootly API token (overrides environment variables)"
     )
+    parser.add_argument(
+        "--include-github",
+        action="store_true",
+        help="Include GitHub activity data in burnout analysis"
+    )
+    parser.add_argument(
+        "--refresh-github-cache",
+        action="store_true",
+        help="Refresh GitHub data cache (forces API calls)"
+    )
     
     args = parser.parse_args()
     
@@ -280,6 +292,58 @@ async def main():
         
         print(f"Collected {len(raw_data['users'])} users and {len(raw_data['incidents'])} incidents")
         
+        # GitHub integration
+        if args.include_github:
+            print("Integrating GitHub activity data...")
+            
+            # Check GitHub token
+            github_token = os.getenv('GITHUB_TOKEN')
+            if not github_token:
+                print("❌ GitHub integration requires GITHUB_TOKEN in secrets.env")
+                print("Run without --include-github or add your GitHub token")
+                sys.exit(1)
+            
+            # Set refresh flag in config
+            if args.refresh_github_cache:
+                config['_refresh_github_cache'] = True
+                print("🔄 Refreshing GitHub cache...")
+            
+            # Enable GitHub integration in config
+            config['github_integration']['enabled'] = True
+            
+            # Correlate Rootly users with GitHub accounts
+            correlator = GitHubCorrelator(github_token, config)
+            github_correlations = correlator.correlate_users(raw_data['users'])
+            
+            # Add correlation results to raw_data for analysis
+            raw_data['github_correlations'] = github_correlations
+            
+            # Report correlation results
+            matched_count = sum(1 for v in github_correlations.values() if v is not None)
+            total_count = len(github_correlations)
+            match_rate = (matched_count / total_count * 100) if total_count > 0 else 0
+            
+            print(f"✅ GitHub correlation: {matched_count}/{total_count} users matched ({match_rate:.1f}%)")
+            
+            if matched_count < total_count:
+                unmatched = [email for email, github in github_correlations.items() if github is None]
+                print(f"   📝 Add {len(unmatched)} users to config.json user_mappings for better coverage")
+            
+            # Collect GitHub activity data
+            if matched_count > 0:
+                print("📊 Collecting GitHub activity data...")
+                github_collector = GitHubCollector(github_token, config)
+                github_activity = github_collector.collect_github_data(
+                    github_correlations, 
+                    config['analysis']['days_to_analyze']
+                )
+                
+                # Add GitHub activity to raw_data
+                raw_data['github_activity'] = github_activity
+                print(f"✅ GitHub activity collected for {len(github_activity)} users")
+            else:
+                print("⚠️  No matched users found, skipping GitHub activity collection")
+        
         # Burnout analysis
         print("Analyzing burnout risk...")
         analyzer = BurnoutAnalyzer(config)
@@ -291,8 +355,17 @@ async def main():
             user_id = user["id"]
             user_incidents = user_incident_mapping.get(user_id, [])
             
+            # Get GitHub activity for this user if available
+            github_activity_for_user = None
+            if args.include_github and 'github_activity' in raw_data:
+                # Find GitHub username for this user
+                github_correlations = raw_data.get('github_correlations', {})
+                github_username = github_correlations.get(user["email"])
+                if github_username and github_username in raw_data['github_activity']:
+                    github_activity_for_user = raw_data['github_activity'][github_username]
+            
             analysis = analyzer.analyze_user_burnout(
-                user, user_incidents, raw_data["incidents"]
+                user, user_incidents, raw_data["incidents"], github_activity_for_user
             )
             individual_analyses.append(analysis)
         
