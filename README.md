@@ -1,18 +1,12 @@
 # Rootly Burnout Detector
 
-A data-driven burnout detection system for on-call engineers using Rootly's incident data and Christina Maslach's Burnout Inventory research. The system connects to Rootly's [MCP Server](https://github.com/Rootly-AI-Labs/Rootly-MCP-server/tree/main), enabling secure and efficient data retrieval.
+A comprehensive burnout detection system for on-call engineers using Rootly's incident data, enhanced with GitHub coding patterns and Slack communication analysis. Built on Christina Maslach's Burnout Inventory research and connects to Rootly's [MCP Server](https://github.com/Rootly-AI-Labs/Rootly-MCP-server/tree/main).
 
 ![Rootly Burnout Analysis Dashboard](dashboard-screenshot.png)
 
-## Requirements
-
-- Python 3.12+
-- uv package manager (`brew install uv` or see [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/))
-- Rootly API token
-
 ## Quick Start
 
-1. **Setup Environment**
+1. **Install Dependencies**
    ```bash
    pip install -r requirements.txt
    ```
@@ -20,20 +14,7 @@ A data-driven burnout detection system for on-call engineers using Rootly's inci
 2. **Configure API Tokens**
    ```bash
    cp secrets.env.example secrets.env
-   ```
-   
-   Edit `secrets.env` and add your tokens:
-   ```bash
-   # Required
-   ROOTLY_API_TOKEN=your-rootly-api-token-here
-   
-   # Optional - for GitHub integration
-   GITHUB_TOKEN=ghp_your-github-personal-access-token
-   
-   # Optional - for interactive Q&A mode (add one)
-   OPENAI_API_KEY=sk-your-openai-key-here      # GPT-4
-   ANTHROPIC_API_KEY=sk-ant-your-anthropic-key # Claude
-   HF_TOKEN=hf_your-huggingface-token          # Hugging Face (free)
+   # Edit secrets.env with your tokens
    ```
 
 3. **Run Analysis**
@@ -41,290 +22,222 @@ A data-driven burnout detection system for on-call engineers using Rootly's inci
    # Standard analysis (incident data only)
    python main.py --days 30
    
-   # Enhanced analysis with GitHub activity data
-   python main.py --include-github --days 30
+   # Enhanced analysis with all integrations
+   python main.py --include-github --include-slack --days 30
    ```
 
-4. **Interactive Mode (Optional)**
-   ```bash
-   # Requires LLM API key configured in step 2
-   python main.py --days 30 --interactive
-   ```
-
-5. **View Results**
+4. **View Results**
    ```bash
    open output/dashboard.html
    ```
 
 ## Configuration
 
-### Token Management
+### Required Setup
 
-The Rootly API token is configured in the `secrets.env` file as shown in the Quick Start section above. The token can also be provided via environment variable or command line flag if needed.
+Edit `secrets.env`:
+```bash
+# Required
+ROOTLY_API_TOKEN=your-rootly-api-token-here
+
+# Optional integrations
+GITHUB_TOKEN=ghp_your-github-personal-access-token
+SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
+
+# Optional - for interactive Q&A mode
+OPENAI_API_KEY=sk-your-openai-key-here      # GPT-4
+ANTHROPIC_API_KEY=sk-ant-your-anthropic-key # Claude  
+HF_TOKEN=hf_your-huggingface-token          # Hugging Face (free)
+```
 
 ### Analysis Settings
 
 Edit `config/config.json` to adjust:
-- Analysis time period (default: 30 days)
-- Burnout risk thresholds
-- Business hours definition
-- Severity weights
-- Output options
+- Analysis time period and thresholds
+- GitHub organizations to analyze
+- Slack user mappings
+- Business hours and severity weights
 
-### Interactive Mode
+## Features
 
-For interactive Q&A mode, set one LLM API key:
-- `OPENAI_API_KEY` - GPT-4 (paid, high quality)
-- `ANTHROPIC_API_KEY` - Claude (paid, high quality)  
-- `HF_TOKEN` - Hugging Face (free tier available)
+### Core Analysis
+- **Maslach Burnout Inventory** - Three-dimensional scoring system
+- **Timezone-aware** after-hours detection (9 AM - 5 PM per timezone)
+- **Individual and team-level** risk assessment
+- **Interactive HTML dashboard** with detailed metrics
+- **Configurable thresholds** and scoring parameters
 
-## GitHub Integration
+### GitHub Integration (Optional)
+Analyzes coding patterns to detect burnout indicators:
 
-The Rootly Burnout Detector can integrate GitHub activity data to provide a more comprehensive burnout assessment by analyzing both incident response patterns and coding work patterns.
+**Setup:**
+1. Create GitHub Personal Access Token with `repo`, `public_repo`, `user:email` scopes
+2. Add `GITHUB_TOKEN` to `secrets.env`
+3. Configure organizations in `config.json`
 
-### Setup GitHub Integration
+**Usage:**
+```bash
+python main.py --include-github --days 30
+```
 
-1. **Create GitHub Personal Access Token**
-   - Go to GitHub Settings → Developer Settings → Personal Access Tokens → Tokens (classic)
-   - Generate a new token with these scopes:
-     - `repo` (for private repositories)
-     - `public_repo` (for public repositories)
-     - `user:email` (for email correlation)
+**Metrics:**
+- After-hours and weekend coding activity
+- Commit clustering patterns (stress indicators)
+- Repository context switching
+- Pull request collaboration rates
+- Productive coding frequency
 
-2. **Configure Token**
-   ```bash
-   # Add to secrets.env
-   GITHUB_TOKEN=ghp_your-github-personal-access-token
-   ```
+### Slack Integration (Optional)
+Analyzes communication patterns for early burnout detection:
 
-3. **Configure Organizations**
-   
-   Edit `config/config.json` to specify your GitHub organizations:
-   ```json
-   {
-     "github_integration": {
-       "enabled": false,
-       "organizations": ["your-org-1", "your-org-2"],
-       "user_mappings": {
-         "engineer@company.com": "github-username"
-       }
-     }
-   }
-   ```
+**Setup:**
+1. Create Slack App with bot permissions: `channels:read`, `channels:history`, `users:read`, `users:read.email`
+2. Install to workspace and copy Bot Token
+3. Add `SLACK_BOT_TOKEN` to `secrets.env`
+4. Invite bot to channels: `/invite @YourBot`
 
-### Usage
+**Usage:**
+```bash
+python main.py --include-slack --days 30
+```
+
+**Metrics:**
+- Message timing and volume patterns
+- After-hours communication indicators
+- Thread participation and collaboration
+- Sentiment analysis with VADER
+- Stress keyword detection
+
+### Interactive Mode (Optional)
+LLM-powered Q&A interface for deeper analysis:
 
 ```bash
-# Include GitHub data in burnout analysis
-python main.py --include-github --days 30
-
-# Refresh GitHub cache (forces new API calls)
-python main.py --include-github --refresh-github-cache --days 30
-
-# Standard analysis without GitHub data
-python main.py --days 30
+python main.py --days 30 --interactive
 ```
 
-### How It Works
+Requires one of: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `HF_TOKEN`
 
-1. **User Correlation**: Automatically correlates Rootly users with GitHub accounts by:
-   - Mining commit history for email addresses
-   - Matching email patterns and usernames
-   - Using manual mappings from configuration
+## Burnout Scoring System
 
-2. **Activity Collection**: Gathers 30 days of GitHub activity:
-   - Commits (with timestamp and repository info)
-   - Pull requests (creation and collaboration patterns)
-   - Issues (assignment and resolution)
+Based on **Maslach's Burnout Assessment Inventory** with three dimensions:
 
-3. **Burnout Analysis Integration**: Enhances the three Maslach dimensions:
+### 1. Emotional Exhaustion (40% weight)
+- **Incident Data**: Frequency, after-hours work, resolution time, clustering
+- **GitHub Data**: After-hours commits, weekend coding, commit bursts
+- **Slack Data**: Message volume, after-hours communication, stress indicators
 
-   **Emotional Exhaustion** (+30% GitHub weight):
-   - After-hours commits percentage
-   - Weekend coding activity  
-   - Commit clustering (rapid consecutive commits indicating stress)
+### 2. Depersonalization (30% weight)
+- **Incident Data**: Escalation rates, solo work, communication quality
+- **GitHub Data**: Repository switching, reduced collaboration
+- **Slack Data**: Thread participation, private messaging patterns
 
-   **Depersonalization** (+30% GitHub weight):
-   - Repository switching patterns (scattered focus)
-   - Pull request collaboration rates
-   - Code review participation
+### 3. Personal Accomplishment (30% weight, inverted)
+- **Incident Data**: Resolution success, improvement trends, knowledge sharing
+- **GitHub Data**: Productive commit frequency, PR collaboration
+- **Slack Data**: Healthy communication patterns, consistent presence
 
-   **Personal Accomplishment** (+30% GitHub weight):
-   - Productive commit frequency (sweet spot: 3-8 commits/week)
-   - Pull request creation rates
-   - Repository contribution diversity
+### Scoring Formula
 
-### Caching & Performance
-
-- **Indefinite Caching**: GitHub data is cached in `.github_cache/` directory
-- **Fast Subsequent Runs**: Uses cached data unless `--refresh-github-cache` is specified
-- **Optimized API Usage**: Searches user activity directly instead of scanning repositories
-- **Rate Limit Friendly**: Respects GitHub API limits (5000 requests/hour)
-
-### User Correlation
-
-The system automatically discovers user correlations by:
-1. **Email Mining**: Extracts email addresses from commit history across organizations
-2. **Pattern Matching**: Matches usernames and email patterns
-3. **Manual Mappings**: Supports explicit user mappings in config for improved accuracy
-
-Example correlation output:
+**Standard Analysis:**
 ```
-✅ GitHub correlation: 15/40 users matched (37.5%)
-📝 Add 25 users to config.json user_mappings for better coverage
+Burnout Score = (Emotional Exhaustion × 0.4) + (Depersonalization × 0.3) + ((10 - Personal Accomplishment) × 0.3)
 ```
 
-### Benefits
+**Enhanced Analysis (with integrations):**
+```
+Each Dimension = (Incident Component × 70%) + (GitHub Component × 15%) + (Slack Component × 15%)
+```
 
-- **Holistic View**: Combines incident stress with coding work patterns
-- **Early Detection**: Identifies burnout patterns that incident data alone might miss
-- **Work-Life Balance**: Detects after-hours and weekend work patterns
-- **Productivity Insights**: Understands sustainable vs. excessive coding activity
-- **Collaboration Patterns**: Identifies social withdrawal through reduced PR/review activity
+**Risk Levels:**
+- **0-3.9**: Low risk - Healthy engagement
+- **4.0-6.9**: Medium risk - Early warning signs
+- **7.0-10**: High risk - Immediate intervention needed
 
-### Data Storage
+## Command Line Options
 
-GitHub data is stored in:
-- **Cache**: `.github_cache/activity_{username}_{dates}.json` (gitignored)
-- **Analysis Results**: Integrated into `output/burnout_analysis.json`
-- **Correlation Data**: Email mappings cached for fast subsequent runs
+```bash
+# Core options
+python main.py --days 30                    # Standard analysis
+python main.py --config custom.json        # Custom configuration
+
+# Integration options  
+python main.py --include-github             # Add GitHub analysis
+python main.py --include-slack              # Add Slack analysis
+python main.py --include-github --include-slack  # Full analysis
+
+# Cache management
+python main.py --refresh-github-cache       # Force GitHub data refresh
+python main.py --refresh-slack-cache        # Force Slack data refresh
+
+# Advanced options
+python main.py --interactive                # Enable Q&A mode
+python main.py --output-dir custom/         # Custom output directory
+```
 
 ## Project Structure
 
 ```
 rootly-burnout-detector/
 ├── config/
-│   ├── config.json           # Default configuration
-│   └── config.example.json   # Example configuration
+│   └── config.json              # Configuration settings
 ├── src/
-│   ├── mcp_client.py         # MCP server connection
-│   ├── data_collector.py     # Data extraction from Rootly
-│   ├── burnout_analyzer.py   # Risk calculation engine (with GitHub integration)
-│   ├── dashboard.py          # HTML report generation
-│   ├── github_correlator.py  # User correlation between Rootly and GitHub
-│   ├── github_collector.py   # GitHub activity data collection
-│   ├── interactive_analyzer.py # LLM-powered Q&A interface
-│   └── burnout_tools.py      # Custom smolagents tools
+│   ├── mcp_client.py           # MCP server connection
+│   ├── data_collector.py       # Rootly data extraction  
+│   ├── burnout_analyzer.py     # Risk calculation engine
+│   ├── dashboard.py            # HTML dashboard generation
+│   ├── github_correlator.py    # GitHub user correlation
+│   ├── github_collector.py     # GitHub activity collection
+│   ├── slack_analyzer.py       # Slack pattern analysis
+│   ├── slack_collector.py      # Slack data collection
+│   └── interactive_analyzer.py # LLM Q&A interface
 ├── output/
-│   ├── burnout_analysis.json # Analysis results (includes GitHub data)
-│   ├── dashboard.html        # Interactive dashboard
-│   ├── summary_report.txt    # Text summary
-│   └── individual_reports/   # Per-user detailed reports
-├── .github_cache/            # GitHub data cache (git-ignored)
-│   ├── activity_*.json       # Cached user activity data
-│   └── email_mapping.json    # User correlation cache
-├── secrets.env               # API tokens (git-ignored)
-├── secrets.env.example       # Example secrets file
-├── requirements.txt          # Python dependencies
-└── main.py                  # Entry point
+│   ├── burnout_analysis.json   # Complete analysis results
+│   ├── dashboard.html          # Interactive dashboard
+│   └── summary_report.txt      # Executive summary
+├── .github_cache/              # GitHub data cache (git-ignored)
+├── .slack_cache/               # Slack data cache (git-ignored)
+├── secrets.env                 # API tokens (git-ignored)
+└── main.py                     # Entry point
 ```
 
-## Features
+## Output Files
 
-- **Timezone-aware after-hours detection** (9 AM - 5 PM per engineer's timezone)
-- **Maslach Burnout Inventory inspired scoring** (Emotional Exhaustion, Depersonalization, Personal Accomplishment)
-- **GitHub Integration** (optional) - Combines incident data with coding activity patterns
-- **Automatic user correlation** between Rootly and GitHub accounts
-- **Individual and team-level analysis**
-- **Configurable thresholds and parameters**
-- **Interactive HTML dashboard**
-- **JSON export for further analysis**
-- **Intelligent caching** for fast subsequent analysis runs
+- **`dashboard.html`** - Interactive dashboard with charts and user details
+- **`burnout_analysis.json`** - Complete analysis data in JSON format
+- **`summary_report.txt`** - Executive summary with key metrics
+- **`individual_reports/`** - Detailed per-user analysis reports
 
+## Performance & Caching
 
-## Burnout Metrics
+- **Smart Caching**: GitHub and Slack data cached locally for fast re-runs
+- **Rate Limit Friendly**: Respects API limits across all integrations
+- **Optimized Queries**: Direct user activity searches, not repository scanning
+- **Cache Management**: Use `--refresh-*-cache` flags to update data
 
-### Emotional Exhaustion Indicators
-**Incident Data:**
-- High incident frequency
-- Extended incident durations  
-- Frequent after-hours responses
-- Short recovery time between incidents
+## Requirements
 
-**GitHub Data** (when `--include-github` is used):
-- After-hours commits percentage
-- Weekend coding activity
-- Commit clustering (rapid consecutive commits)
+- Python 3.12+
+- uv package manager (`brew install uv`)
+- Rootly API token
+- Optional: GitHub Personal Access Token
+- Optional: Slack Bot Token
+- Optional: LLM API key (OpenAI, Anthropic, or Hugging Face)
 
-### Depersonalization Indicators
-**Incident Data:**
-- Decreased collaboration
-- Increased escalation rates
-- Reduced post-incident participation
+## Testing
 
-**GitHub Data** (when `--include-github` is used):
-- Repository switching patterns (scattered focus)
-- Reduced pull request creation
-- Lower code review participation
+Mock data generators available for testing without real API access:
+```bash
+# Generate test Slack conversations
+python src/slack_mock_generator.py
 
-### Personal Accomplishment Indicators
-**Incident Data:**
-- Resolution success rates
-- Time to resolution improvements
-- Knowledge sharing participation
-
-**GitHub Data** (when `--include-github` is used):
-- Productive commit frequency (optimal: 3-8 commits/week)
-- Pull request collaboration rates
-- Consistent repository contributions
-
-## Output
-
-- **Individual Risk Scores**: Per-engineer burnout risk (0-10 scale)
-- **Team Aggregations**: Department/team level insights
-- **Trend Analysis**: Changes over time
-- **Actionable Recommendations**: Suggested interventions
-
-## MCP Server
-
-The tool uses uvx to automatically download and run the Rootly MCP server:
-
-- **Automatic setup**: No manual installation required
-- **Always latest**: Gets the most recent version automatically  
-- **Clean environment**: Uses temporary isolated environment
-- **No conflicts**: Doesn't interfere with your Python packages
-
-## How Burnout Scores Are Calculated
-
-This tool uses **Christina Maslach's Burnout Assessment Inventory**, adapted for on-call engineering work. The system analyzes three dimensions:
-
-### 1. **Emotional Exhaustion (40% weight)**
-Measures physical and emotional depletion from work demands:
-- Incident frequency relative to team norms
-- After-hours work percentage  
-- Average incident resolution time
-- Incident clustering (multiple incidents within 4 hours)
-
-### 2. **Depersonalization (30% weight)**  
-Measures cynicism and detachment from work:
-- Escalation frequency (inability to resolve alone)
-- Solo incident handling rate
-- Response time trends (are you getting slower to respond over time?)
-- Communication quality (resolution message length)
-
-### 3. **Personal Accomplishment (30% weight, inverted)**
-Measures sense of achievement and competence:
-- Incident resolution success rate
-- Resolution time improvement trends
-- Handling of complex/high-severity incidents  
-- Knowledge sharing and documentation quality
-
-### Overall Score
-
-**Standard Analysis** (incident data only):
-```
-Burnout Score = (Emotional Exhaustion × 0.4) + (Depersonalization × 0.3) + ((10 - Personal Accomplishment) × 0.3)
+# Test with mock mode
+python main.py --include-slack --days 30
 ```
 
-**Enhanced Analysis** (with `--include-github`):
-```
-Each Dimension = (Incident Component × 0.7) + (GitHub Component × 0.3)
-Burnout Score = (Emotional Exhaustion × 0.4) + (Depersonalization × 0.3) + ((10 - Personal Accomplishment) × 0.3)
-```
+## Privacy & Security
 
-**Score Ranges:**
-- **0-3.9**: Low risk - Healthy engagement levels
-- **4.0-6.9**: Medium risk - Early warning signs, intervention recommended
-- **7.0-10**: High risk - Immediate action needed
-
-The scoring system identifies early burnout indicators through incident response patterns, enabling proactive interventions before burnout becomes severe.
+- **Local Processing**: All analysis performed locally
+- **No Message Content**: Slack integration analyzes patterns, not message text
+- **Aggregate Metrics**: Focuses on timing and behavioral patterns
+- **Secure Storage**: API tokens in git-ignored `secrets.env` file
+- **Optional Integrations**: All enhanced features are opt-in

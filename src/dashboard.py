@@ -226,7 +226,7 @@ class BurnoutDashboard:
             <p class="timestamp">Analysis completed: {formatted_timestamp}</p>
             <p>Period: {metadata.get('days_analyzed', 'N/A')} days | 
                Users: {metadata.get('total_users_analyzed', 'N/A')} | 
-               Incidents: {metadata.get('total_incidents', 'N/A')}{self._get_github_integration_status(metadata)}</p>
+               Incidents: {metadata.get('total_incidents', 'N/A')}{self._get_github_integration_status(metadata)}{self._get_slack_integration_status(metadata)}</p>
             
             <div style="margin-top: 15px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; border-left: 4px solid #007bff;">
                 <h4 style="margin: 0 0 10px 0; color: #495057;">How Burnout Scores Are Calculated</h4>
@@ -490,6 +490,7 @@ class BurnoutDashboard:
         </div>
         
         {self._generate_github_metrics_section(dimensions)}
+        {self._generate_slack_metrics_section(dimensions)}
         """
         
         return details_html
@@ -512,6 +513,16 @@ class BurnoutDashboard:
         
         if github_config.get('enabled', False):
             return ' | <span style="color: #28a745;">✓ GitHub Integration Enabled</span>'
+        else:
+            return ''
+    
+    def _get_slack_integration_status(self, metadata: Dict[str, Any]) -> str:
+        """Get Slack integration status display text."""
+        config = metadata.get('config_used', {})
+        slack_config = config.get('slack_integration', {})
+        
+        if slack_config.get('enabled', False):
+            return ' | <span style="color: #17a2b8;">✓ Slack Integration Enabled</span>'
         else:
             return ''
     
@@ -579,6 +590,88 @@ class BurnoutDashboard:
             <div class="metric-row">
                 <span>Repositories Worked On:</span>
                 <span><strong>{github_metrics['github_repositories_touched']}</strong></span>
+            </div>"""
+        
+        html += """
+        </div>"""
+        
+        return html
+    
+    def _generate_slack_metrics_section(self, dimensions: Dict[str, Any]) -> str:
+        """Generate Slack metrics section if Slack data is available."""
+        # Check if any dimension has Slack indicators
+        has_slack_data = False
+        slack_metrics = {}
+        
+        for dimension_name, dimension_data in dimensions.items():
+            indicators = dimension_data.get('indicators', {})
+            for key, value in indicators.items():
+                if key.startswith('slack_') and value is not None:
+                    has_slack_data = True
+                    slack_metrics[key] = value
+        
+        if not has_slack_data:
+            return ""
+        
+        # Format Slack metrics for display
+        html = """
+        <div class="detail-section">
+            <div class="detail-label">💬 Slack Communication Metrics</div>"""
+        
+        # Add relevant Slack metrics
+        if 'slack_messages_per_day' in slack_metrics:
+            html += f"""
+            <div class="metric-row">
+                <span>Messages/Day:</span>
+                <span><strong>{slack_metrics['slack_messages_per_day']:.1f}</strong></span>
+            </div>"""
+        
+        if 'slack_after_hours_percentage' in slack_metrics:
+            html += f"""
+            <div class="metric-row">
+                <span>After-Hours Messages:</span>
+                <span><strong>{slack_metrics['slack_after_hours_percentage']:.1f}%</strong></span>
+            </div>"""
+        
+        if 'slack_weekend_percentage' in slack_metrics:
+            html += f"""
+            <div class="metric-row">
+                <span>Weekend Messages:</span>
+                <span><strong>{slack_metrics['slack_weekend_percentage']:.1f}%</strong></span>
+            </div>"""
+        
+        if 'slack_avg_sentiment' in slack_metrics:
+            sentiment = slack_metrics['slack_avg_sentiment']
+            sentiment_color = '#28a745' if sentiment > 0.1 else '#ffc107' if sentiment > -0.1 else '#dc3545'
+            sentiment_label = 'Positive' if sentiment > 0.1 else 'Neutral' if sentiment > -0.1 else 'Negative'
+            html += f"""
+            <div class="metric-row">
+                <span>Avg Sentiment:</span>
+                <span><strong style="color: {sentiment_color};">{sentiment:.2f} ({sentiment_label})</strong></span>
+            </div>"""
+        
+        if 'slack_negative_sentiment_ratio' in slack_metrics:
+            html += f"""
+            <div class="metric-row">
+                <span>Negative Messages:</span>
+                <span><strong>{slack_metrics['slack_negative_sentiment_ratio']:.1f}%</strong></span>
+            </div>"""
+        
+        if 'slack_stress_indicator_ratio' in slack_metrics:
+            html += f"""
+            <div class="metric-row">
+                <span>Stress Indicators:</span>
+                <span><strong>{slack_metrics['slack_stress_indicator_ratio']:.1f}%</strong></span>
+            </div>"""
+        
+        if 'slack_sentiment_volatility' in slack_metrics:
+            volatility = slack_metrics['slack_sentiment_volatility']
+            volatility_color = '#dc3545' if volatility > 0.4 else '#ffc107' if volatility > 0.2 else '#28a745'
+            volatility_label = 'High' if volatility > 0.4 else 'Moderate' if volatility > 0.2 else 'Low'
+            html += f"""
+            <div class="metric-row">
+                <span>Emotional Volatility:</span>
+                <span><strong style="color: {volatility_color};">{volatility:.2f} ({volatility_label})</strong></span>
             </div>"""
         
         html += """

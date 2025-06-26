@@ -24,7 +24,8 @@ class BurnoutAnalyzer:
         user: Dict[str, Any], 
         user_incidents: List[str],
         all_incidents: List[Dict[str, Any]],
-        github_activity: Dict[str, Any] = None
+        github_activity: Dict[str, Any] = None,
+        slack_activity: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Calculate comprehensive burnout risk for a single user."""
         
@@ -35,9 +36,9 @@ class BurnoutAnalyzer:
             return self._create_empty_analysis(user)
         
         # Calculate the three Maslach dimensions
-        emotional_exhaustion = self._calculate_emotional_exhaustion(user, incidents, github_activity)
-        depersonalization = self._calculate_depersonalization(user, incidents, github_activity)
-        personal_accomplishment = self._calculate_personal_accomplishment(user, incidents, github_activity)
+        emotional_exhaustion = self._calculate_emotional_exhaustion(user, incidents, github_activity, slack_activity)
+        depersonalization = self._calculate_depersonalization(user, incidents, github_activity, slack_activity)
+        personal_accomplishment = self._calculate_personal_accomplishment(user, incidents, github_activity, slack_activity)
         
         # Calculate overall burnout score
         weights = self.scoring
@@ -79,7 +80,8 @@ class BurnoutAnalyzer:
         self, 
         user: Dict[str, Any], 
         incidents: List[Dict[str, Any]],
-        github_activity: Dict[str, Any] = None
+        github_activity: Dict[str, Any] = None,
+        slack_activity: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Calculate emotional exhaustion indicators."""
         
@@ -142,12 +144,31 @@ class BurnoutAnalyzer:
                 'github_total_commits': total_commits
             }
         
-        # Combine scores - if GitHub is available, weight it at 30% vs 70% for incidents
-        if github_activity and self.config.get('github_integration', {}).get('enabled', False):
-            incident_component = (frequency_score + after_hours_score + duration_score + cluster_score) / 4
+        # Slack integration for emotional exhaustion
+        slack_score = 0
+        slack_indicators = {}
+        if slack_activity and self.config.get('slack_integration', {}).get('enabled', False):
+            from slack_analyzer import SlackAnalyzer
+            slack_analyzer = SlackAnalyzer(self.config)
+            slack_analysis = slack_analyzer.analyze_user_slack_activity(slack_activity)
+            slack_score = slack_analysis.get('emotional_exhaustion', {}).get('score', 0)
+            slack_indicators = slack_analysis.get('emotional_exhaustion', {}).get('indicators', {})
+        
+        # Combine scores with different data sources
+        # Weight distribution: Incidents (50%), GitHub (25%), Slack (25%)
+        has_github = github_activity and self.config.get('github_integration', {}).get('enabled', False)
+        has_slack = slack_activity and self.config.get('slack_integration', {}).get('enabled', False)
+        
+        incident_component = (frequency_score + after_hours_score + duration_score + cluster_score) / 4
+        
+        if has_github and has_slack:
+            overall_score = (incident_component * 0.5) + (github_score * 0.25) + (slack_score * 0.25)
+        elif has_github:
             overall_score = (incident_component * 0.7) + (github_score * 0.3)
+        elif has_slack:
+            overall_score = (incident_component * 0.7) + (slack_score * 0.3)
         else:
-            overall_score = (frequency_score + after_hours_score + duration_score + cluster_score) / 4
+            overall_score = incident_component
         
         indicators = {
             "incidents_per_week": round(incidents_per_week, 2),
@@ -161,11 +182,16 @@ class BurnoutAnalyzer:
         if github_indicators:
             indicators.update(github_indicators)
         
+        # Add Slack indicators if available
+        if slack_indicators:
+            slack_prefixed = {f"slack_{k}": v for k, v in slack_indicators.items()}
+            indicators.update(slack_prefixed)
+        
         return {
             "score": round(overall_score, 2),
             "indicators": indicators,
             "contributing_factors": self._identify_exhaustion_factors(
-                frequency_score, after_hours_score, duration_score, cluster_score, github_score
+                frequency_score, after_hours_score, duration_score, cluster_score, github_score, slack_score
             )
         }
     
@@ -173,7 +199,8 @@ class BurnoutAnalyzer:
         self, 
         user: Dict[str, Any], 
         incidents: List[Dict[str, Any]],
-        github_activity: Dict[str, Any] = None
+        github_activity: Dict[str, Any] = None,
+        slack_activity: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Calculate depersonalization indicators."""
         
@@ -269,7 +296,8 @@ class BurnoutAnalyzer:
         self, 
         user: Dict[str, Any], 
         incidents: List[Dict[str, Any]],
-        github_activity: Dict[str, Any] = None
+        github_activity: Dict[str, Any] = None,
+        slack_activity: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """Calculate personal accomplishment indicators (higher score = better)."""
         
@@ -587,7 +615,7 @@ class BurnoutAnalyzer:
         
         return recommendations
     
-    def _identify_exhaustion_factors(self, freq: float, after_hrs: float, duration: float, cluster: float, github_score: float = 0) -> List[str]:
+    def _identify_exhaustion_factors(self, freq: float, after_hrs: float, duration: float, cluster: float, github_score: float = 0, slack_score: float = 0) -> List[str]:
         """Identify specific contributing factors to emotional exhaustion."""
         factors = []
         if freq >= 7: factors.append("High incident frequency")
@@ -595,6 +623,7 @@ class BurnoutAnalyzer:
         if duration >= 7: factors.append("Long resolution times")
         if cluster >= 7: factors.append("Incident clustering")
         if github_score >= 7: factors.append("High after-hours coding activity")
+        if slack_score >= 7: factors.append("High Slack communication stress patterns")
         return factors
     
     def _identify_depersonalization_factors(self, esc: float, solo: float, deg: float, comm: float, github_score: float = 0) -> List[str]:

@@ -52,6 +52,7 @@ from burnout_analyzer import BurnoutAnalyzer
 from dashboard import BurnoutDashboard
 from github_correlator import GitHubCorrelator
 from github_collector import GitHubCollector
+from slack_collector import SlackCollector
 
 
 def setup_logging(debug: bool = False):
@@ -227,6 +228,16 @@ async def main():
         action="store_true",
         help="Refresh GitHub data cache (forces API calls)"
     )
+    parser.add_argument(
+        "--include-slack",
+        action="store_true",
+        help="Include Slack communication data in burnout analysis"
+    )
+    parser.add_argument(
+        "--refresh-slack-cache",
+        action="store_true",
+        help="Refresh Slack data cache (forces API calls)"
+    )
     
     args = parser.parse_args()
     
@@ -344,6 +355,49 @@ async def main():
             else:
                 print("⚠️  No matched users found, skipping GitHub activity collection")
         
+        # Slack integration
+        if args.include_slack:
+            print("Integrating Slack communication data...")
+            
+            # Check Slack token
+            slack_token = os.getenv('SLACK_BOT_TOKEN')
+            if not slack_token:
+                print("❌ Slack integration requires SLACK_BOT_TOKEN in secrets.env")
+                print("Run without --include-slack or add your Slack token")
+                sys.exit(1)
+            
+            # Set refresh flag in config
+            if args.refresh_slack_cache:
+                config['_refresh_slack_cache'] = True
+                print("🔄 Refreshing Slack cache...")
+            
+            # Enable Slack integration in config
+            if 'slack_integration' not in config:
+                config['slack_integration'] = {}
+            config['slack_integration']['enabled'] = True
+            
+            # Create user mappings for Slack (email -> slack user ID)
+            # Use configured mappings from config.json
+            configured_mappings = config.get('slack_integration', {}).get('user_mappings', {})
+            slack_mappings = {}
+            
+            for user in raw_data['users']:
+                user_email = user['email']
+                if user_email in configured_mappings:
+                    slack_mappings[user_email] = configured_mappings[user_email]
+            
+            # Collect Slack activity data
+            print("📊 Collecting Slack communication data...")
+            slack_collector = SlackCollector(slack_token, config)
+            slack_activity = slack_collector.collect_slack_data(
+                slack_mappings, 
+                config['analysis']['days_to_analyze']
+            )
+            
+            # Add Slack activity to raw_data
+            raw_data['slack_activity'] = slack_activity
+            print(f"✅ Slack activity collected for {len(slack_activity)} users")
+        
         # Burnout analysis
         print("Analyzing burnout risk...")
         analyzer = BurnoutAnalyzer(config)
@@ -364,8 +418,17 @@ async def main():
                 if github_username and github_username in raw_data['github_activity']:
                     github_activity_for_user = raw_data['github_activity'][github_username]
             
+            # Get Slack activity for this user if available
+            slack_activity_for_user = None
+            if args.include_slack and 'slack_activity' in raw_data:
+                # Find Slack user ID for this user from configured mappings
+                configured_mappings = config.get('slack_integration', {}).get('user_mappings', {})
+                slack_user_id = configured_mappings.get(user["email"])
+                if slack_user_id and slack_user_id in raw_data['slack_activity']:
+                    slack_activity_for_user = raw_data['slack_activity'][slack_user_id]
+            
             analysis = analyzer.analyze_user_burnout(
-                user, user_incidents, raw_data["incidents"], github_activity_for_user
+                user, user_incidents, raw_data["incidents"], github_activity_for_user, slack_activity_for_user
             )
             individual_analyses.append(analysis)
         
