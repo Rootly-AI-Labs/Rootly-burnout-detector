@@ -10,12 +10,12 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional, Tuple, Union
 
 # Load environment variables from multiple sources
-def load_environment_variables():
+def load_environment_variables() -> None:
     """Load environment variables from .env, secrets.env, etc."""
-    env_files = [".env", "secrets.env"]
+    env_files: List[str] = [".env", "secrets.env"]
     
     # Try using python-dotenv first
     try:
@@ -55,9 +55,9 @@ from github_collector import GitHubCollector
 from slack_collector import SlackCollector
 
 
-def setup_logging(debug: bool = False):
+def setup_logging(debug: bool = False) -> None:
     """Configure logging."""
-    level = logging.DEBUG if debug else logging.INFO
+    level: int = logging.DEBUG if debug else logging.INFO
     logging.basicConfig(
         level=level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -77,8 +77,8 @@ def load_config(config_path: str) -> Dict[str, Any]:
             config = json.load(f)
         
         # Validate required environment variables
-        required_env = ["ROOTLY_API_TOKEN"]
-        missing_env = []
+        required_env: List[str] = ["ROOTLY_API_TOKEN"]
+        missing_env: List[str] = []
         
         for env_var in required_env:
             if not os.getenv(env_var):
@@ -96,12 +96,12 @@ def load_config(config_path: str) -> Dict[str, Any]:
         sys.exit(1)
 
 
-def save_results(results: Dict[str, Any], output_dir: str):
+def save_results(results: Dict[str, Any], output_dir: str) -> None:
     """Save analysis results to files."""
     os.makedirs(output_dir, exist_ok=True)
     
     # Save main results
-    results_path = os.path.join(output_dir, "burnout_analysis.json")
+    results_path: str = os.path.join(output_dir, "burnout_analysis.json")
     with open(results_path, "w") as f:
         json.dump(results, f, indent=2)
     
@@ -109,7 +109,7 @@ def save_results(results: Dict[str, Any], output_dir: str):
     
     # Save individual user reports
     if "individual_analyses" in results:
-        individual_dir = os.path.join(output_dir, "individual_reports")
+        individual_dir: str = os.path.join(output_dir, "individual_reports")
         os.makedirs(individual_dir, exist_ok=True)
         
         for analysis in results["individual_analyses"]:
@@ -122,23 +122,23 @@ def save_results(results: Dict[str, Any], output_dir: str):
     generate_summary_report(results, output_dir)
 
 
-def generate_summary_report(results: Dict[str, Any], output_dir: str):
+def generate_summary_report(results: Dict[str, Any], output_dir: str) -> None:
     """Generate a human-readable summary report."""
-    summary_path = os.path.join(output_dir, "summary_report.txt")
+    summary_path: str = os.path.join(output_dir, "summary_report.txt")
     
     with open(summary_path, "w") as f:
         f.write("ROOTLY BURNOUT ANALYSIS SUMMARY\n")
         f.write("=" * 40 + "\n\n")
         
         # Overall statistics
-        metadata = results.get("metadata", {})
+        metadata: Dict[str, Any] = results.get("metadata", {})
         f.write(f"Analysis Period: {metadata.get('days_analyzed', 'N/A')} days\n")
         f.write(f"Total Users Analyzed: {metadata.get('total_users_analyzed', 'N/A')}\n")
         f.write(f"Total Incidents: {metadata.get('total_incidents', 'N/A')}\n")
         f.write(f"Analysis Date: {metadata.get('analysis_timestamp', 'N/A')}\n\n")
         
         # Risk distribution
-        individual_analyses = results.get("individual_analyses", [])
+        individual_analyses: List[Dict[str, Any]] = results.get("individual_analyses", [])
         if individual_analyses:
             f.write("RISK DISTRIBUTION\n")
             f.write("-" * 20 + "\n")
@@ -147,12 +147,12 @@ def generate_summary_report(results: Dict[str, Any], output_dir: str):
             low_count = sum(1 for a in individual_analyses if a.get("risk_level") == "low")
             
             # Separate active on-call users from all users
-            active_users = [a for a in individual_analyses if a.get("analysis_period", {}).get("incident_count", 0) > 0]
-            all_scores = [a.get("burnout_score", 0) for a in individual_analyses]
-            active_scores = [a.get("burnout_score", 0) for a in active_users]
+            active_users: List[Dict[str, Any]] = [a for a in individual_analyses if a.get("analysis_period", {}).get("incident_count", 0) > 0]
+            all_scores: List[Union[int, float]] = [a.get("burnout_score", 0) for a in individual_analyses]
+            active_scores: List[Union[int, float]] = [a.get("burnout_score", 0) for a in active_users]
             
-            avg_score_all = sum(all_scores) / len(all_scores) if all_scores else 0
-            avg_score_active = sum(active_scores) / len(active_scores) if active_scores else 0
+            avg_score_all: float = sum(all_scores) / len(all_scores) if all_scores else 0
+            avg_score_active: float = sum(active_scores) / len(active_scores) if active_scores else 0
             
             f.write(f"High Risk: {high_count} users\n")
             f.write(f"Medium Risk: {medium_count} users\n")
@@ -162,7 +162,7 @@ def generate_summary_report(results: Dict[str, Any], output_dir: str):
             f.write(f"Users with Zero Incidents: {len(individual_analyses) - len(active_users)} users\n\n")
         
         # High-risk users
-        high_risk_users = [
+        high_risk_users: List[Dict[str, Any]] = [
             analysis for analysis in results.get("individual_analyses", [])
             if analysis.get("risk_level") == "high"
         ]
@@ -180,7 +180,7 @@ def generate_summary_report(results: Dict[str, Any], output_dir: str):
     print(f"Summary report saved to {summary_path}")
 
 
-async def main():
+async def main() -> None:
     """Main execution function."""
     parser = argparse.ArgumentParser(description="Analyze burnout risk for Rootly on-call engineers")
     parser.add_argument(
@@ -239,11 +239,11 @@ async def main():
         help="Refresh Slack data cache (forces API calls)"
     )
     
-    args = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
     
     # Setup
     setup_logging(args.debug)
-    logger = logging.getLogger(__name__)
+    logger: logging.Logger = logging.getLogger(__name__)
     
     print("Rootly Burnout Detector")
     print("=" * 30)
@@ -258,7 +258,7 @@ async def main():
         print("✓ Rootly authentication configured")
     
     # Load configuration
-    config = load_config(args.config)
+    config: Dict[str, Any] = load_config(args.config)
     
     # Override days if specified
     if args.days:
@@ -278,13 +278,13 @@ async def main():
     try:
         # Data collection
         print("Collecting data from Rootly...")
-        collector = RootlyDataCollector(config)
+        collector: RootlyDataCollector = RootlyDataCollector(config)
         
         try:
-            raw_data = await collector.collect_all_data()
+            raw_data: Dict[str, Any] = await collector.collect_all_data()
         except (RuntimeError, Exception) as e:
             # Extract the root cause from nested exception groups
-            error_msg = str(e)
+            error_msg: str = str(e)
             if "Failed to fetch users from Rootly" in error_msg:
                 print(f"\n❌ Failed to fetch users from Rootly. Check your API token and MCP server connection.")
             elif "TaskGroup" in error_msg and "401" in error_msg:
@@ -308,7 +308,7 @@ async def main():
             print("Integrating GitHub activity data...")
             
             # Check GitHub token
-            github_token = os.getenv('GITHUB_TOKEN')
+            github_token: Optional[str] = os.getenv('GITHUB_TOKEN')
             if not github_token:
                 print("❌ GitHub integration requires GITHUB_TOKEN in secrets.env")
                 print("Run without --include-github or add your GitHub token")
@@ -323,28 +323,28 @@ async def main():
             config['github_integration']['enabled'] = True
             
             # Correlate Rootly users with GitHub accounts
-            correlator = GitHubCorrelator(github_token, config)
-            github_correlations = correlator.correlate_users(raw_data['users'])
+            correlator: GitHubCorrelator = GitHubCorrelator(github_token, config)
+            github_correlations: Dict[str, Optional[str]] = correlator.correlate_users(raw_data['users'])
             
             # Add correlation results to raw_data for analysis
             raw_data['github_correlations'] = github_correlations
             
             # Report correlation results
-            matched_count = sum(1 for v in github_correlations.values() if v is not None)
-            total_count = len(github_correlations)
-            match_rate = (matched_count / total_count * 100) if total_count > 0 else 0
+            matched_count: int = sum(1 for v in github_correlations.values() if v is not None)
+            total_count: int = len(github_correlations)
+            match_rate: float = (matched_count / total_count * 100) if total_count > 0 else 0
             
             print(f"✅ GitHub correlation: {matched_count}/{total_count} users matched ({match_rate:.1f}%)")
             
             if matched_count < total_count:
-                unmatched = [email for email, github in github_correlations.items() if github is None]
+                unmatched: List[str] = [email for email, github in github_correlations.items() if github is None]
                 print(f"   📝 Add {len(unmatched)} users to config.json user_mappings for better coverage")
             
             # Collect GitHub activity data
             if matched_count > 0:
                 print("📊 Collecting GitHub activity data...")
-                github_collector = GitHubCollector(github_token, config)
-                github_activity = github_collector.collect_github_data(
+                github_collector: GitHubCollector = GitHubCollector(github_token, config)
+                github_activity: Dict[str, Any] = github_collector.collect_github_data(
                     github_correlations, 
                     config['analysis']['days_to_analyze']
                 )
@@ -360,7 +360,7 @@ async def main():
             print("Integrating Slack communication data...")
             
             # Check Slack token
-            slack_token = os.getenv('SLACK_BOT_TOKEN')
+            slack_token: Optional[str] = os.getenv('SLACK_BOT_TOKEN')
             if not slack_token:
                 print("❌ Slack integration requires SLACK_BOT_TOKEN in secrets.env")
                 print("Run without --include-slack or add your Slack token")
@@ -378,18 +378,18 @@ async def main():
             
             # Create user mappings for Slack (email -> slack user ID)
             # Use configured mappings from config.json
-            configured_mappings = config.get('slack_integration', {}).get('user_mappings', {})
-            slack_mappings = {}
+            configured_mappings: Dict[str, str] = config.get('slack_integration', {}).get('user_mappings', {})
+            slack_mappings: Dict[str, str] = {}
             
             for user in raw_data['users']:
-                user_email = user['email']
+                user_email: str = user['email']
                 if user_email in configured_mappings:
                     slack_mappings[user_email] = configured_mappings[user_email]
             
             # Collect Slack activity data
             print("📊 Collecting Slack communication data...")
-            slack_collector = SlackCollector(slack_token, config)
-            slack_activity = slack_collector.collect_slack_data(
+            slack_collector: SlackCollector = SlackCollector(slack_token, config)
+            slack_activity: Dict[str, Any] = slack_collector.collect_slack_data(
                 slack_mappings, 
                 config['analysis']['days_to_analyze']
             )
@@ -400,41 +400,41 @@ async def main():
         
         # Burnout analysis
         print("Analyzing burnout risk...")
-        analyzer = BurnoutAnalyzer(config)
+        analyzer: BurnoutAnalyzer = BurnoutAnalyzer(config)
         
-        individual_analyses = []
-        user_incident_mapping = raw_data["user_incident_mapping"]
+        individual_analyses: List[Dict[str, Any]] = []
+        user_incident_mapping: Dict[str, List[str]] = raw_data["user_incident_mapping"]
         
         for user in raw_data["users"]:
-            user_id = user["id"]
-            user_incidents = user_incident_mapping.get(user_id, [])
+            user_id: str = user["id"]
+            user_incidents: List[str] = user_incident_mapping.get(user_id, [])
             
             # Get GitHub activity for this user if available
-            github_activity_for_user = None
+            github_activity_for_user: Optional[Dict[str, Any]] = None
             if args.include_github and 'github_activity' in raw_data:
                 # Find GitHub username for this user
-                github_correlations = raw_data.get('github_correlations', {})
-                github_username = github_correlations.get(user["email"])
+                github_correlations: Dict[str, Optional[str]] = raw_data.get('github_correlations', {})
+                github_username: Optional[str] = github_correlations.get(user["email"])
                 if github_username and github_username in raw_data['github_activity']:
                     github_activity_for_user = raw_data['github_activity'][github_username]
             
             # Get Slack activity for this user if available
-            slack_activity_for_user = None
+            slack_activity_for_user: Optional[Dict[str, Any]] = None
             if args.include_slack and 'slack_activity' in raw_data:
                 # Find Slack user ID for this user from configured mappings
-                configured_mappings = config.get('slack_integration', {}).get('user_mappings', {})
-                slack_user_id = configured_mappings.get(user["email"])
+                configured_mappings: Dict[str, str] = config.get('slack_integration', {}).get('user_mappings', {})
+                slack_user_id: Optional[str] = configured_mappings.get(user["email"])
                 if slack_user_id and slack_user_id in raw_data['slack_activity']:
                     slack_activity_for_user = raw_data['slack_activity'][slack_user_id]
             
-            analysis = analyzer.analyze_user_burnout(
+            analysis: Dict[str, Any] = analyzer.analyze_user_burnout(
                 user, user_incidents, raw_data["incidents"], github_activity_for_user, slack_activity_for_user
             )
             individual_analyses.append(analysis)
         
         
         # Compile results
-        results = {
+        results: Dict[str, Any] = {
             "metadata": {
                 "analysis_timestamp": raw_data["collection_metadata"]["timestamp"],
                 "days_analyzed": config["analysis"]["days_to_analyze"],
@@ -457,8 +457,8 @@ async def main():
         # Generate dashboard
         if config.get("output", {}).get("create_dashboard", True):
             print("Generating dashboard...")
-            dashboard = BurnoutDashboard(results)
-            dashboard_path = os.path.join(args.output, "dashboard.html")
+            dashboard: BurnoutDashboard = BurnoutDashboard(results)
+            dashboard_path: str = os.path.join(args.output, "dashboard.html")
             dashboard.generate_dashboard(dashboard_path)
             print(f"Dashboard saved to {dashboard_path}")
         
@@ -472,12 +472,12 @@ async def main():
             low_count = sum(1 for a in individual_analyses if a.get("risk_level") == "low")
             
             # Separate active on-call users from all users
-            active_users = [a for a in individual_analyses if a.get("analysis_period", {}).get("incident_count", 0) > 0]
-            all_scores = [a.get("burnout_score", 0) for a in individual_analyses]
-            active_scores = [a.get("burnout_score", 0) for a in active_users]
+            active_users: List[Dict[str, Any]] = [a for a in individual_analyses if a.get("analysis_period", {}).get("incident_count", 0) > 0]
+            all_scores: List[Union[int, float]] = [a.get("burnout_score", 0) for a in individual_analyses]
+            active_scores: List[Union[int, float]] = [a.get("burnout_score", 0) for a in active_users]
             
-            avg_score_all = sum(all_scores) / len(all_scores) if all_scores else 0
-            avg_score_active = sum(active_scores) / len(active_scores) if active_scores else 0
+            avg_score_all: float = sum(all_scores) / len(all_scores) if all_scores else 0
+            avg_score_active: float = sum(active_scores) / len(active_scores) if active_scores else 0
             
             print(f"High risk: {high_count}")
             print(f"Medium risk: {medium_count}")
@@ -488,7 +488,7 @@ async def main():
             print("No users analyzed")
         
         # Show high-risk users
-        high_risk = [a for a in individual_analyses if a["risk_level"] == "high"]
+        high_risk: List[Dict[str, Any]] = [a for a in individual_analyses if a["risk_level"] == "high"]
         if high_risk:
             print(f"\nHIGH RISK USERS:")
             for user in high_risk[:5]:  # Show top 5
@@ -502,13 +502,15 @@ async def main():
                 from src.interactive_analyzer import InteractiveAnalyzer, check_interactive_requirements
                 
                 # Check if interactive mode is available
+                available: bool
+                message: str
                 available, message = check_interactive_requirements()
                 if not available:
                     print(f"\nInteractive mode not available: {message}")
                 else:
                     print(f"\n{message}")
-                    analyzer = InteractiveAnalyzer(results)
-                    analyzer.start_session()
+                    interactive_analyzer: InteractiveAnalyzer = InteractiveAnalyzer(results)
+                    interactive_analyzer.start_session()
                     
             except ImportError as e:
                 print(f"\nInteractive mode not available: {e}")
