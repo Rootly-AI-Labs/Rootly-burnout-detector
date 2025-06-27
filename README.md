@@ -121,6 +121,8 @@ Requires one of: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `HF_TOKEN`
 
 Based on **Maslach's Burnout Assessment Inventory** with three dimensions:
 
+> 📖 **[Detailed Calculation Methodology →](docs/burnout-calculation.md)**
+
 ### 1. Emotional Exhaustion (40% weight)
 - **Incident Data**: Frequency, after-hours work, resolution time, clustering
 - **GitHub Data**: After-hours commits, weekend coding, commit bursts
