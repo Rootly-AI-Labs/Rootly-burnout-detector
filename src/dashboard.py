@@ -277,17 +277,39 @@ class BurnoutDashboard:
             type: 'bar',
             data: {{
                 labels: {json.dumps(chart_data['user_names'])},
-                datasets: [{{
-                    label: 'Burnout Score',
-                    data: {json.dumps(chart_data['scores'])},
-                    backgroundColor: {json.dumps(chart_data['colors'])}
-                }}]
+                datasets: [
+                    {{
+                        label: 'Incident Data',
+                        data: {json.dumps(chart_data['incident_scores'])},
+                        backgroundColor: {json.dumps(chart_data['incident_colors'])},
+                        borderColor: {json.dumps(chart_data['incident_colors'])},
+                        borderWidth: 0
+                    }},
+                    {{
+                        label: 'GitHub Data',
+                        data: {json.dumps(chart_data['github_scores'])},
+                        backgroundColor: {json.dumps(chart_data['github_colors'])},
+                        borderColor: {json.dumps(chart_data['github_colors'])},
+                        borderWidth: 0
+                    }},
+                    {{
+                        label: 'Slack Data',
+                        data: {json.dumps(chart_data['slack_scores'])},
+                        backgroundColor: {json.dumps(chart_data['slack_colors'])},
+                        borderColor: {json.dumps(chart_data['slack_colors'])},
+                        borderWidth: 0
+                    }}
+                ]
             }},
             options: {{
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {{
+                    x: {{
+                        stacked: true
+                    }},
                     y: {{
+                        stacked: true,
                         beginAtZero: true,
                         max: 10,
                         ticks: {{
@@ -297,7 +319,37 @@ class BurnoutDashboard:
                 }},
                 plugins: {{
                     legend: {{
-                        display: false
+                        display: true,
+                        position: 'bottom',
+                        labels: {{
+                            boxWidth: 12,
+                            padding: 10,
+                            font: {{
+                                size: 11
+                            }}
+                        }}
+                    }},
+                    tooltip: {{
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {{
+                            afterTitle: function(context) {{
+                                const dataIndex = context[0].dataIndex;
+                                const total = context[0].chart.data.datasets.reduce((sum, dataset) => {{
+                                    return sum + (dataset.data[dataIndex] || 0);
+                                }}, 0);
+                                return 'Total Score: ' + total.toFixed(2);
+                            }},
+                            label: function(context) {{
+                                const value = context.parsed.y;
+                                const dataIndex = context.dataIndex;
+                                const total = context.chart.data.datasets.reduce((sum, dataset) => {{
+                                    return sum + (dataset.data[dataIndex] || 0);
+                                }}, 0);
+                                const percentage = ((value / total) * 100).toFixed(0);
+                                return context.dataset.label + ': ' + value.toFixed(2) + ' (' + percentage + '% of total)';
+                            }}
+                        }}
                     }}
                 }},
                 layout: {{
@@ -326,10 +378,14 @@ class BurnoutDashboard:
         return html
     
     def _prepare_chart_data(self, individual_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Prepare data for JavaScript charts."""
+        """Prepare data for JavaScript charts with stacked data source contributions."""
         user_names = []
-        scores = []
-        colors = []
+        incident_scores = []
+        github_scores = []
+        slack_scores = []
+        incident_colors = []
+        github_colors = []
+        slack_colors = []
         
         # User scores data (sorted by score, descending)
         sorted_analyses = sorted(
@@ -340,22 +396,69 @@ class BurnoutDashboard:
         
         for analysis in sorted_analyses:
             user_names.append(analysis.get('user_name', 'Unknown'))
-            score = analysis.get('burnout_score', 0)
-            scores.append(score)
             
-            # Color based on risk level
+            # Calculate data source contributions
+            # Get the burnout score components from the analysis
+            burnout_score = analysis.get('burnout_score', 0)
+            data_source_contributions = analysis.get('data_source_contributions', {})
+            
+            # If we have detailed contributions, use them
+            if data_source_contributions:
+                incident_scores.append(round(data_source_contributions.get('incident', burnout_score * 0.7), 2))
+                github_scores.append(round(data_source_contributions.get('github', 0), 2))
+                slack_scores.append(round(data_source_contributions.get('slack', 0), 2))
+            else:
+                # Estimate based on whether integrations were used
+                has_github = self._has_github_data(analysis)
+                has_slack = self._has_slack_data(analysis)
+                
+                if has_github and has_slack:
+                    # All three sources
+                    incident_scores.append(round(burnout_score * 0.7, 2))
+                    github_scores.append(round(burnout_score * 0.15, 2))
+                    slack_scores.append(round(burnout_score * 0.15, 2))
+                elif has_github:
+                    # Incident + GitHub
+                    incident_scores.append(round(burnout_score * 0.85, 2))
+                    github_scores.append(round(burnout_score * 0.15, 2))
+                    slack_scores.append(0)
+                elif has_slack:
+                    # Incident + Slack
+                    incident_scores.append(round(burnout_score * 0.85, 2))
+                    github_scores.append(0)
+                    slack_scores.append(round(burnout_score * 0.15, 2))
+                else:
+                    # Incident only
+                    incident_scores.append(round(burnout_score, 2))
+                    github_scores.append(0)
+                    slack_scores.append(0)
+            
+            # Determine colors based on risk level with different shades
             risk_level = analysis.get('risk_level', 'low')
             if risk_level == 'high':
-                colors.append('#dc3545')
+                # Red shades
+                incident_colors.append('#dc3545')  # Darkest red
+                github_colors.append('#e65665')    # Medium red
+                slack_colors.append('#f07885')     # Light red
             elif risk_level == 'medium':
-                colors.append('#ffc107')
+                # Yellow shades
+                incident_colors.append('#ffc107')  # Darkest yellow
+                github_colors.append('#ffcd38')    # Medium yellow
+                slack_colors.append('#ffd969')     # Light yellow
             else:
-                colors.append('#28a745')
+                # Green shades
+                incident_colors.append('#28a745')  # Darkest green
+                github_colors.append('#48b461')    # Medium green
+                slack_colors.append('#68c17d')     # Light green
         
         return {
             'user_names': user_names,
-            'scores': scores,
-            'colors': colors
+            'incident_scores': incident_scores,
+            'github_scores': github_scores,
+            'slack_scores': slack_scores,
+            'incident_colors': incident_colors,
+            'github_colors': github_colors,
+            'slack_colors': slack_colors
         }
     
     def _generate_user_list(self, individual_analyses: List[Dict[str, Any]]) -> str:
@@ -678,6 +781,26 @@ class BurnoutDashboard:
         </div>"""
         
         return html
+    
+    def _has_github_data(self, analysis: Dict[str, Any]) -> bool:
+        """Check if analysis includes GitHub data."""
+        dimensions = analysis.get('dimensions', {})
+        for dimension in dimensions.values():
+            indicators = dimension.get('indicators', {})
+            for key in indicators:
+                if key.startswith('github_') and indicators[key] is not None:
+                    return True
+        return False
+    
+    def _has_slack_data(self, analysis: Dict[str, Any]) -> bool:
+        """Check if analysis includes Slack data."""
+        dimensions = analysis.get('dimensions', {})
+        for dimension in dimensions.values():
+            indicators = dimension.get('indicators', {})
+            for key in indicators:
+                if key.startswith('slack_') and indicators[key] is not None:
+                    return True
+        return False
 
 
 def generate_dashboard_from_file(results_file: str, output_file: str):

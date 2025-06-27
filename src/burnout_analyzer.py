@@ -48,6 +48,32 @@ class BurnoutAnalyzer:
             (10 - personal_accomplishment["score"]) * weights.get("personal_accomplishment_weight", 0.3)
         )
         
+        # Calculate data source contributions to the overall score
+        has_github = github_activity and self.config.get('github_integration', {}).get('enabled', False)
+        has_slack = slack_activity and self.config.get('slack_integration', {}).get('enabled', False)
+        
+        # Calculate weighted contributions
+        incident_contribution = 0
+        github_contribution = 0
+        slack_contribution = 0
+        
+        if has_github and has_slack:
+            # All three sources: 70% incident, 15% github, 15% slack
+            incident_contribution = overall_score * 0.7
+            github_contribution = overall_score * 0.15
+            slack_contribution = overall_score * 0.15
+        elif has_github:
+            # Incident + GitHub: 85% incident, 15% github
+            incident_contribution = overall_score * 0.85
+            github_contribution = overall_score * 0.15
+        elif has_slack:
+            # Incident + Slack: 85% incident, 15% slack
+            incident_contribution = overall_score * 0.85
+            slack_contribution = overall_score * 0.15
+        else:
+            # Incident only: 100% incident
+            incident_contribution = overall_score
+        
         # Determine risk level
         risk_level = self._determine_risk_level(overall_score)
         
@@ -56,7 +82,7 @@ class BurnoutAnalyzer:
             emotional_exhaustion, depersonalization, personal_accomplishment
         )
         
-        return {
+        result = {
             "user_id": user["id"],
             "user_name": user["name"],
             "user_email": user["email"],
@@ -75,6 +101,16 @@ class BurnoutAnalyzer:
             "recommendations": recommendations,
             "analysis_timestamp": datetime.now().isoformat()
         }
+        
+        # Add data source contributions
+        if has_github or has_slack:
+            result["data_source_contributions"] = {
+                "incident": round(incident_contribution, 2),
+                "github": round(github_contribution, 2),
+                "slack": round(slack_contribution, 2)
+            }
+        
+        return result
     
     def _calculate_emotional_exhaustion(
         self, 
