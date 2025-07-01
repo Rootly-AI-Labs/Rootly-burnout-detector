@@ -7,6 +7,9 @@ httpx>=0.24.0
 # Data processing
 python-dateutil>=2.8.0
 
+# Slack integration dependencies
+vaderSentiment>=3.3.2
+
 # Optional visualization dependencies
 plotly>=5.17.0
 
